@@ -56,6 +56,7 @@ button{cursor:pointer}
 /* Contenido */
 .main{padding:28px 34px 60px;min-width:0;max-width:1180px}
 .topbar{display:none}
+.scrim{display:none}
 .ph{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px}
 h1{font-family:var(--f-d);font-size:30px;line-height:1.15;margin:0 0 4px}
 h2{font-family:var(--f-d);font-size:19px;margin:0 0 12px}
@@ -85,7 +86,7 @@ h2{font-family:var(--f-d);font-size:19px;margin:0 0 12px}
 /* Empresas */
 .tools{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
 .tools input{flex:1;min-width:200px}
-input[type=text],input[type=search],select,textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+input[type=text],input[type=search],input[type=password],select,textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
 textarea{resize:vertical;min-height:64px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
 .card{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
@@ -639,7 +640,7 @@ function resumen(tipo,d){
   if(tipo==='nadine')return d.workspaces.length+' empresas, '+suma(d.workspaces,'scripts')+' guiones, '+suma(d.workspaces,'content')+' publicaciones, '+suma(d.workspaces,'ideas')+' ideas, '+suma(d.workspaces,'flows')+' automatizaciones';
   if(tipo==='creadormp')return d.brands.length+' marcas, '+d.projects.length+' proyectos, '+(d.media||[]).length+' audios y medios';
   if(tipo==='hmpi')return Object.keys(d.D).length+' empresas con diagnóstico y tareas';
-  return d.list.length+' espacios de diseño';
+  return d.list.length+(d.list.length===1?' espacio de diseño':' espacios de diseño');
 }
 function reducirLogo(src){
   return new Promise(function(res){
