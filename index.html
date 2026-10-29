@@ -272,7 +272,7 @@ function vInicio(){
     return '<div class="row"><div class="row-main"><div class="row-t"><a href="#'+m.id+'" style="color:inherit">'+m.n+'</a></div><div class="row-s">Viene de '+esc(m.o)+'</div></div><span class="badge mut">'+(m.id==='ajustes'?'En proceso':'Etapa 2')+'</span></div>';
   }).join('');
   return '<header class="ph"><div><h1>Panel general</h1><p class="sub">Todas tus empresas y herramientas en un solo lugar.</p></div><button class="btn pri" data-act="nueva">Nueva empresa</button></header>'+
-    '<section class="stats"><div class="stat"><b>'+n+'</b><span>Empresas registradas</span></div><div class="stat"><b>'+(a?esc(a.nombre):'-')+'</b><span>Empresa activa</span></div><div class="stat"><b>'+full+' de '+n+'</b><span>Fichas completas</span></div></section>'+
+    (ultimoResp()?'':'<p class="hint" style="margin:0 0 18px">Aún no has descargado un respaldo. Hazlo en <a href="#ajustes" style="color:var(--acc)">Ajustes</a> para no perder tus datos.</p>')+'<section class="stats"><div class="stat"><b>'+n+'</b><span>Empresas registradas</span></div><div class="stat"><b>'+(a?esc(a.nombre):'-')+'</b><span>Empresa activa</span></div><div class="stat"><b>'+full+' de '+n+'</b><span>Fichas completas</span></div></section>'+
     '<h2>Tus empresas</h2>'+(n?'<div class="panel">'+rows+'</div>':emptyHtml())+
     '<h2>Módulos</h2><div class="panel"><div class="row"><div class="row-main"><div class="row-t"><a href="#empresas" style="color:inherit">Empresas</a></div><div class="row-s">Ficha única de cada empresa</div></div><span class="badge ok">Listo</span></div>'+mods+'</div>';
 }
@@ -303,13 +303,17 @@ function vModulo(id){
     '<div class="row"><div class="row-main"><div class="row-s">Se traslada desde '+esc(m.o)+'. Cuando la base esté lista, este módulo se integra aquí con todos sus datos.</div></div></div></div>';
 }
 function vAjustes(){
-  return '<header class="ph"><div><h1>Ajustes</h1><p class="sub">Seguridad y datos de la plataforma.</p></div><button class="btn" data-act="bloquear">Bloquear ahora</button></header>'+
+  var u=ultimoResp();
+  return '<header class="ph"><div><h1>Ajustes</h1><p class="sub">Seguridad, respaldo y datos de la plataforma.</p></div><button class="btn" data-act="bloquear">Bloquear ahora</button></header>'+
    '<h2>Clave de acceso</h2><div class="panel"><form id="frmClave" class="pw" autocomplete="off">'+
    '<div class="f"><label for="c0">Clave actual</label><input type="password" id="c0" autocomplete="current-password" required></div>'+
    '<div class="f"><label for="c1">Clave nueva</label><input type="password" id="c1" autocomplete="new-password" minlength="6" required><small>Mínimo 6 caracteres.</small></div>'+
    '<div class="f"><label for="c2">Repite la clave nueva</label><input type="password" id="c2" autocomplete="new-password" required></div>'+
    '<div><button type="submit" class="btn pri">Cambiar clave</button></div></form></div>'+
-   '<p class="hint">La clave protege el acceso a esta plataforma en este navegador. Respaldo, importación de datos viejos y sincronización entre equipos llegan en las siguientes tareas.</p>';
+   '<h2>Respaldo</h2><div class="panel">'+
+   '<div class="row"><div class="row-main"><div class="row-t">Exportar respaldo</div><div class="row-s">Descarga un archivo con todas tus empresas y logos. '+(u?'Último respaldo: '+esc(fmtFecha(u))+'.':'Aún no has descargado ningún respaldo.')+'</div></div><button class="btn pri" data-act="exportar">Descargar respaldo</button></div>'+
+   '<div class="row"><div class="row-main"><div class="row-t">Restaurar respaldo</div><div class="row-s">Reemplaza los datos actuales por los del archivo. La clave de este navegador no cambia.</div></div><label class="btn" for="rf" style="cursor:pointer">Elegir archivo</label><input type="file" id="rf" accept=".json,application/json" hidden></div></div>'+
+   '<p class="hint">La clave protege el acceso en este navegador. La importación de datos de las apps anteriores y la sincronización entre equipos llegan en las siguientes tareas.</p>';
 }
 function renderMain(){
   var r=route(),h=r==='inicio'?vInicio():r==='empresas'?vEmpresas():r==='ajustes'?vAjustes():vModulo(r);
@@ -395,6 +399,7 @@ document.addEventListener('click',function(ev){
   else if(act==='editar')openForm(id);
   else if(act==='cerrar')$('#dlg').close();
   else if(act==='bloquear')bloquear();
+  else if(act==='exportar')exportar();
   else if(act==='olvide')olvide();
   else if(act==='quitarLogo'){logoTmp='';$('#logoFile').value='';prevLogo()}
   else if(act==='usar'){setActiva(id);var e=S.empresas.filter(function(x){return x.id===id})[0];if(e)toast('Empresa activa: '+e.nombre);document.body.classList.remove('open')}
@@ -512,6 +517,55 @@ function cambiarClave(ev){
   }).catch(function(){toast('No se pudo cambiar la clave en este navegador.')});
 }
 document.addEventListener('submit',function(ev){if(ev.target.id==='frmClave')cambiarClave(ev)});
+
+/* Respaldo único */
+var BKEY='mpconsultoria_ultimo_respaldo';
+function ultimoResp(){try{var t=localStorage.getItem(BKEY);return t?new Date(t):null}catch(e){return null}}
+function fmtFecha(d){return d.toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'})+', '+d.toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit'})}
+function exportar(){
+  var now=new Date();
+  var data={app:'MPCONSULTORIA',version:1,fecha:now.toISOString(),datos:{empresas:S.empresas,activa:S.activa}};
+  var blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+  var url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='mpconsultoria-respaldo-'+now.toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url)},1500);
+  try{localStorage.setItem(BKEY,now.toISOString())}catch(e){}
+  toast('Respaldo descargado');renderMain();
+}
+function limpiarEmpresa(x){
+  var o={};
+  for(var k in x){if(typeof x[k]==='string')o[k]=x[k]}
+  if(typeof x.creada==='number')o.creada=x.creada;
+  if(o.logo&&o.logo.indexOf('data:image/')!==0)o.logo='';
+  if(!/^#[0-9a-f]{6}$/i.test(o.color||''))delete o.color;
+  return blank(o);
+}
+function restaurar(file){
+  var rd=new FileReader();
+  rd.onerror=function(){toast('No se pudo leer el archivo.')};
+  rd.onload=function(){
+    var d;
+    try{d=JSON.parse(rd.result)}catch(e){return toast('El archivo no es un respaldo válido.')}
+    if(!d||d.app!=='MPCONSULTORIA'||!d.datos||!Array.isArray(d.datos.empresas))return toast('Ese archivo no es un respaldo de MPCONSULTORIA.');
+    var seen={},em=[];
+    d.datos.empresas.forEach(function(x){
+      if(!x||typeof x!=='object'||typeof x.nombre!=='string'||!x.nombre.trim())return;
+      var e=limpiarEmpresa(x);
+      while(seen[e.id])e.id=uid();
+      seen[e.id]=1;em.push(e);
+    });
+    var f=d.fecha?new Date(d.fecha):null,ft=f&&!isNaN(f)?' del '+fmtFecha(f):'';
+    if(!confirm('Se reemplazarán las '+S.empresas.length+' empresas actuales por las '+em.length+' del respaldo'+ft+'. ¿Continuar?'))return;
+    S.empresas=em;
+    S.activa=seen[d.datos.activa]?d.datos.activa:(em.length?em[0].id:null);
+    save();renderAll();toast('Respaldo restaurado: '+em.length+' empresas');
+  };
+  rd.readAsText(file);
+}
+document.addEventListener('change',function(ev){
+  if(ev.target.id==='rf'){var f=ev.target.files&&ev.target.files[0];ev.target.value='';if(f)restaurar(f)}
+});
 function boot(){
   var a=getAuth(),ok=false;
   try{ok=sessionStorage.getItem(SKEY)==='1'}catch(e){}
