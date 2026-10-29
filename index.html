@@ -65,6 +65,12 @@ button{cursor:pointer}
 .kc{background:var(--surf2);border-radius:10px;padding:10px;margin-bottom:8px}
 .kc b{display:block;font-size:14px;margin-bottom:6px}
 .kc .acts{margin-top:6px}
+.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.bars{display:flex;align-items:flex-end;gap:14px;height:130px;padding:10px 4px 0}
+.bars div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;font-size:12px;color:var(--mut)}
+.bars i{display:block;width:100%;max-width:60px;background:var(--acc);border-radius:6px 6px 0 0;min-height:3px}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}.tbl th,.tbl td{padding:8px 6px;text-align:right;border-bottom:1px solid var(--line)}.tbl th:first-child,.tbl td:first-child{text-align:left}.tbl th{color:var(--mut);font-weight:500}
+@media (max-width:900px){.kpi{grid-template-columns:1fr 1fr}}
 .pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13px;margin:4px 0 10px}
 .vb{display:block!important}
 .vb h3{font-family:var(--f-d);margin:14px 0 4px;font-size:16px}
@@ -269,7 +275,7 @@ function renderSide(){
     '<div class="menu" id="swMenu" hidden>'+items+(items?'<div class="sep"></div>':'')+'<button type="button" data-act="nueva"><span class="av sm" style="background:var(--acc);color:var(--acc-tx)">+</span><span>Nueva empresa</span></button></div>';
   var cur=route();
   $('#nav').innerHTML=MODS.map(function(m){
-    return '<a href="#'+m.id+'" class="'+(cur===m.id?'on':'')+'">'+svg(m.id)+'<span>'+m.n+'</span>'+(m.d&&m.id!=='ajustes'&&m.id!=='guiones'&&m.id!=='planificador'?'<span class="tag">Etapa 2</span>':'')+'</a>';
+    return '<a href="#'+m.id+'" class="'+(cur===m.id?'on':'')+'">'+svg(m.id)+'<span>'+m.n+'</span>'+(m.d&&m.id!=='ajustes'&&m.id!=='guiones'&&m.id!=='planificador'&&m.id!=='diagnostico'?'<span class="tag">Etapa 2</span>':'')+'</a>';
   }).join('');
 }
 
@@ -284,7 +290,7 @@ function vInicio(){
       '<span class="row-s">Ficha '+p+'%</span>'+(isA?'<span class="badge">Activa</span>':'<button class="btn sm" data-act="usar" data-id="'+e.id+'">Trabajar con esta</button>')+'</div>';
   }).join('');
   var mods=MODS.filter(function(m){return m.d}).map(function(m){
-    return '<div class="row"><div class="row-main"><div class="row-t"><a href="#'+m.id+'" style="color:inherit">'+m.n+'</a></div><div class="row-s">Viene de '+esc(m.o)+'</div></div><span class="badge mut">'+(m.id==='ajustes'?'En proceso':(m.id==='guiones'||m.id==='planificador')?'Listo':'Etapa 2')+'</span></div>';
+    return '<div class="row"><div class="row-main"><div class="row-t"><a href="#'+m.id+'" style="color:inherit">'+m.n+'</a></div><div class="row-s">Viene de '+esc(m.o)+'</div></div><span class="badge mut">'+(m.id==='ajustes'?'En proceso':(m.id==='guiones'||m.id==='planificador'||m.id==='diagnostico')?'Listo':'Etapa 2')+'</span></div>';
   }).join('');
   return '<header class="ph"><div><h1>Panel general</h1><p class="sub">Todas tus empresas y herramientas en un solo lugar.</p></div><button class="btn pri" data-act="nueva">Nueva empresa</button></header>'+
     (ultimoResp()?'':'<p class="hint" style="margin:0 0 18px">Aún no has descargado un respaldo. Hazlo en <a href="#ajustes" style="color:var(--acc)">Ajustes</a> para no perder tus datos.</p>')+'<section class="stats"><div class="stat"><b>'+n+'</b><span>Empresas registradas</span></div><div class="stat"><b>'+(a?esc(a.nombre):'-')+'</b><span>Empresa activa</span></div><div class="stat"><b>'+full+' de '+n+'</b><span>Fichas completas</span></div></section>'+
@@ -346,10 +352,11 @@ function vAjustes(){
    '<p class="hint">La clave protege el acceso en este navegador. La sincronización entre equipos llega en la etapa 3.</p>';
 }
 function renderMain(){
-  var r=route(),h=r==='inicio'?vInicio():r==='empresas'?vEmpresas():r==='ajustes'?vAjustes():r==='guiones'?vGuiones():r==='planificador'?vPlan():vModulo(r);
+  var r=route(),h=r==='inicio'?vInicio():r==='empresas'?vEmpresas():r==='ajustes'?vAjustes():r==='guiones'?vGuiones():r==='planificador'?vPlan():r==='diagnostico'?vDiag():vModulo(r);
   $('#main').innerHTML=h;
   if(r==='guiones')cargarGV();
   if(r==='planificador')cargarPL();
+  if(r==='diagnostico')cargarDG();
   var q=$('#q');
   if(q){q.addEventListener('input',function(){filtro=q.value;var pos=q.selectionStart;renderMain();var n=$('#q');n.focus();n.setSelectionRange(pos,pos)})}
 }
@@ -432,6 +439,10 @@ document.addEventListener('click',function(ev){
   else if(act==='cerrar')$('#dlg').close();
   else if(act==='bloquear')bloquear();
   else if(act==='exportar')exportar();
+  else if(act==='dedit'){if(DGD&&activa())formDiag()}
+  else if(act==='dinforme')verInforme();
+  else if(act==='dtnueva'){if(DGD)nuevaTarea()}
+  else if(act==='dtborrar'){guardarDiag(function(o){o.tareas=o.tareas.filter(function(t){return String(t.id)!==id})})}
   else if(act==='ptab'){PL.tab=id;renderMain()}
   else if(act==='pmes'){movMes(Number(id));pintarPL()}
   else if(act==='pnueva')formPub(PL.mes?{fecha:''}:null);
@@ -616,6 +627,99 @@ document.addEventListener('submit',function(ev){
   if(e){for(var k in o)e[k]=o[k]}else{o.id=uid();S.plan.push(o)}
   if(o.fecha)PL.mes=o.fecha.slice(0,7);
   save();$('#dlg2').close();PL.tab='pub';renderMain();toast('Publicación guardada');
+});
+/* Módulo Diagnóstico y estrategia */
+var DGD=null,BM_DEF={cafeteria:{int:4.5,pub:5,resp:15,leads:45},gastronomia:{int:3.8,pub:4,resp:20,leads:60},local:{int:3.2,pub:4,resp:30,leads:30},artesanal:{int:5.2,pub:4,resp:25,leads:25}};
+var SECT_TIPO={'Cafetería':'cafeteria','Restaurante':'gastronomia','Comercio local':'local','Artesanal':'artesanal'};
+var EST_T=[['todo','Por hacer'],['doing','En proceso'],['done','Hecha']];
+function vDiag(){
+  var a=activa();
+  return '<header class="ph"><div><h1>Diagnóstico y estrategia</h1><p class="sub">'+(a?'Diagnóstico comercial de '+esc(a.nombre)+' frente a su sector.':'Elige una empresa para ver su diagnóstico.')+'</p></div><div class="tools" style="margin:0"><button class="btn" data-act="dedit">Editar datos</button><button class="btn pri" data-act="dinforme">Informe al cliente</button></div></header><div id="dgBody"><p class="sub">Cargando...</p></div>';
+}
+function cargarDG(){
+  var a=activa();if(!a)return;
+  kvGet('legacy:hmpi').catch(function(){return null}).then(function(h){
+    var base={},bm=BM_DEF;
+    if(h){bm=h.datos.BM||BM_DEF;var v=h.vinculos||{};Object.keys(v).forEach(function(k){if(v[k]===a.id)base=h.datos.D[k]||{}})}
+    DGD={base:base,bm:bm};pintarDG();
+  });
+}
+function datosDG(){
+  var a=activa(),o=Object.assign({},DGD.base,(S.diag||{})[a.id]||{});
+  o.sector=o.sector||SECT_TIPO[a.tipo]||'local';
+  o.tareas=((S.diag||{})[a.id]&&S.diag[a.id].tareas)||DGD.base.tareas||[];
+  o.b=DGD.bm[o.sector]||BM_DEF.local;
+  return o;
+}
+function tendencia(v,b,menor){var ok=menor?v<=b:v>=b;return '<span class="badge '+(ok?'ok':'')+'" style="'+(ok?'':'background:rgba(255,107,107,.15);color:var(--bad)')+'">'+(ok?'sobre sector':'bajo sector')+' ('+b+')</span>'}
+function recomendaciones(d){
+  var r=[],b=d.b;
+  if(d.int<b.int)r.push('Sube la interacción: usa videos cortos (Reels), preguntas en historias y responde cada comentario en la primera hora. (hoy: '+d.int+'%, sector: '+b.int+'%)');
+  if(d.pub<b.pub)r.push('Publica más seguido: la meta es llegar a '+b.pub+' publicaciones por semana (hoy: '+d.pub+').');
+  if(d.resp>b.resp)r.push('Responde más rápido en WhatsApp: activa respuestas automáticas y mensajes guardados para bajar de '+d.resp+' a '+b.resp+' minutos.');
+  if(d.leads<b.leads)r.push('Genera más contactos: pon un llamado a la acción y el enlace de WhatsApp en cada publicación. (hoy: '+d.leads+', sector: '+b.leads+' al mes)');
+  var pl=d.plat||{},best=null,nm={fb:'Facebook',ig:'Instagram',tt:'TikTok'};
+  Object.keys(pl).forEach(function(k){if(pl[k]&&(!best||pl[k].int>pl[best].int))best=k});
+  if(best&&Object.keys(pl).some(function(k){return pl[k]&&pl[k].int<pl[best].int}))r.push('Tu mejor plataforma en interacción es '+nm[best]+'. Refuerza ahí y adapta el contenido en las demás.');
+  if(!r.length)r.push('Vas por encima del sector en todos los indicadores. Mantén el ritmo y prueba nuevos formatos.');
+  return r;
+}
+function pintarDG(){
+  var bd=$('#dgBody'),a=activa();if(!bd||!DGD||!a)return;
+  var d=datosDG(),hist=d.hist||[],mx=Math.max.apply(null,hist.concat([1])),nm={fb:'Facebook',ig:'Instagram',tt:'TikTok'};
+  var hechas=d.tareas.filter(function(t){return t.estado==='done'}).length;
+  var tab=Object.keys(d.plat||{}).map(function(k){var x=d.plat[k];return '<tr><td>'+nm[k]+'</td><td>'+x.seg+'</td><td>'+x.alc+'</td><td>'+x.int+'%</td><td>'+x.pub+'</td><td>'+x.leads+'</td></tr>'}).join('');
+  var ts=d.tareas.map(function(t){return '<div class="row"><div class="row-main"><div class="row-t">'+esc(t.titulo)+'</div><div class="row-s">'+esc(t.desc||'')+'</div></div><select data-dt="'+t.id+'" style="width:auto" aria-label="Estado">'+EST_T.map(function(e){return '<option value="'+e[0]+'"'+(e[0]===t.estado?' selected':'')+'>'+e[1]+'</option>'}).join('')+'</select><button class="btn sm del" data-act="dtborrar" data-id="'+t.id+'">Eliminar</button></div>'}).join('');
+  bd.innerHTML=(d.real===false?'<p class="hint" style="margin:0 0 16px">Estos son datos de ejemplo. Pulsa <b>Editar datos</b> para ingresar los reales de '+esc(a.nombre)+'.</p>':'')+
+   '<section class="kpi"><div class="stat"><b>'+d.alcance+'</b><span>Alcance</span></div><div class="stat"><b>'+d.seguidores+'</b><span>Seguidores</span></div><div class="stat"><b>'+hechas+'/'+d.tareas.length+'</b><span>Tareas hechas</span></div><div class="stat"><b>'+(d.notas?'1':'0')+'</b><span>Nota del asesor</span></div></section>'+
+   '<h2>Indicadores vs sector</h2><section class="kpi"><div class="stat"><span>Interacción %</span><b>'+d.int+'</b>'+tendencia(d.int,d.b.int)+'</div><div class="stat"><span>Publicaciones/sem</span><b>'+d.pub+'</b>'+tendencia(d.pub,d.b.pub)+'</div><div class="stat"><span>Resp. WhatsApp (min)</span><b>'+d.resp+'</b>'+tendencia(d.resp,d.b.resp,true)+'</div><div class="stat"><span>Contactos/mes</span><b>'+d.leads+'</b>'+tendencia(d.leads,d.b.leads)+'</div></section>'+
+   '<h2>Evolución del alcance</h2><div class="panel"><div class="bars">'+hist.map(function(v,i){return '<div><span>'+v+'</span><i style="height:'+Math.round(v/mx*85)+'%"></i><span>'+(i===hist.length-1?'Actual':'M'+(i+1))+'</span></div>'}).join('')+'</div></div>'+
+   (tab?'<h2>Plataformas</h2><div class="panel" style="overflow-x:auto"><table class="tbl"><tr><th>Red</th><th>Seguidores</th><th>Alcance</th><th>Interacción</th><th>Pub.</th><th>Contactos</th></tr>'+tab+'</table></div>':'')+
+   '<h2>Recomendaciones prioritarias</h2><div class="panel">'+recomendaciones(d).map(function(t){return '<div class="row"><div class="row-main">'+esc(t)+'</div></div>'}).join('')+'</div>'+
+   (d.notas?'<p class="hint" style="margin:-10px 0 24px"><b style="color:var(--tx)">Nota:</b> '+esc(d.notas)+'</p>':'')+
+   '<div class="ph" style="margin-bottom:8px"><h2 style="margin:0">Tareas</h2><button class="btn sm pri" data-act="dtnueva">Nueva tarea</button></div><div class="panel">'+(ts||'<div class="row"><div class="row-s">Sin tareas.</div></div>')+'</div>';
+}
+function guardarDiag(mut){
+  var a=activa();S.diag=S.diag||{};
+  var o=S.diag[a.id]=S.diag[a.id]||{};
+  if(!o.tareas)o.tareas=JSON.parse(JSON.stringify(datosDG().tareas));
+  mut(o);save();pintarDG();
+}
+function formDiag(){
+  var d=datosDG(),a=activa(),p=d.plat||{},g=function(k){return p[k]&&p[k].usr||''};
+  var f=function(id,l,v,t){return '<div class="f"><label for="'+id+'">'+l+'</label><input type="'+(t||'text')+'"'+(t==='number'?' step="any"':'')+' id="'+id+'" value="'+esc(v)+'"></div>'};
+  abrirD2('Datos de '+a.nombre,'<form id="frmD" class="pw" style="max-width:none">'+f('d1','Alcance',d.alcance||0,'number')+f('d2','Seguidores',d.seguidores||0,'number')+f('d3','Interacción %',d.int||0,'number')+f('d4','Publicaciones por semana',d.pub||0,'number')+f('d5','Respuesta WhatsApp (min)',d.resp||0,'number')+f('d6','Contactos por mes',d.leads||0,'number')+f('d7','Alcance de los últimos 4 meses (separados por coma)',(d.hist||[]).join(', '))+
+   '<div class="f"><label for="d8">Sector de comparación</label><select id="d8">'+Object.keys(DGD.bm).map(function(k){return '<option'+(k===d.sector?' selected':'')+'>'+k+'</option>'}).join('')+'</select></div>'+f('d9','Teléfono WhatsApp del cliente',d.tel||'')+'<div class="f"><label for="d10">Nota</label><textarea id="d10">'+esc(d.notas||'')+'</textarea></div><div><button type="submit" class="btn pri">Guardar datos</button></div></form>');
+}
+document.addEventListener('submit',function(ev){
+  if(ev.target.id!=='frmD')return;
+  ev.preventDefault();
+  var n=function(i){var v=parseFloat($(i).value);return isNaN(v)?0:v};
+  guardarDiag(function(o){
+    o.alcance=n('#d1');o.seguidores=n('#d2');o.int=n('#d3');o.pub=n('#d4');o.resp=n('#d5');o.leads=n('#d6');
+    o.hist=$('#d7').value.split(',').map(function(x){return parseFloat(x)}).filter(function(x){return !isNaN(x)});
+    o.sector=$('#d8').value;o.tel=$('#d9').value.trim();o.notas=$('#d10').value.trim();o.real=true;
+  });
+  $('#dlg2').close();toast('Datos guardados');
+});
+function textoInforme(){
+  var a=activa(),d=datosDG(),h=d.tareas.filter(function(t){return t.estado==='done'}).length;
+  return '*Informe mensual - '+a.nombre+'*\n\nAlcance: '+d.alcance+'\nSeguidores: '+d.seguidores+'\nInteracción: '+d.int+'% (sector '+d.b.int+'%)\nPublicaciones por semana: '+d.pub+' (sector '+d.b.pub+')\nRespuesta en WhatsApp: '+d.resp+' min (sector '+d.b.resp+')\nContactos al mes: '+d.leads+' (sector '+d.b.leads+')\nTareas hechas: '+h+' de '+d.tareas.length+'\n\n*Qué haremos ahora:*\n'+recomendaciones(d).map(function(t,i){return (i+1)+'. '+t}).join('\n');
+}
+function verInforme(){
+  if(!DGD)return;
+  var t=textoInforme(),tel=String(datosDG().tel||'').replace(/\D/g,'');
+  if(tel.length===10)tel='57'+tel;
+  abrirD2('Informe al cliente','<div class="pre">'+esc(t)+'</div><p>'+cp(t,'Copiar informe')+' <a class="btn sm pri" style="text-decoration:none;display:inline-block" target="_blank" rel="noopener" href="https://wa.me/'+tel+'?text='+encodeURIComponent(t)+'">Abrir en WhatsApp</a></p>'+(tel?'':'<p class="row-s">Agrega el teléfono del cliente en "Editar datos" para enviarlo directo.</p>'));
+}
+function nuevaTarea(){
+  abrirD2('Nueva tarea','<form id="frmT" class="pw" style="max-width:none"><div class="f"><label for="t1">Tarea</label><input type="text" id="t1" required></div><div class="f"><label for="t2">Detalle</label><input type="text" id="t2"></div><div><button type="submit" class="btn pri">Guardar tarea</button></div></form>');
+}
+document.addEventListener('submit',function(ev){
+  if(ev.target.id!=='frmT')return;
+  ev.preventDefault();
+  guardarDiag(function(o){var id=o.tareas.reduce(function(m,t){return Math.max(m,Number(t.id)||0)},0)+1;o.tareas.push({id:id,titulo:$('#t1').value.trim(),desc:$('#t2').value.trim(),estado:'todo'})});
+  $('#dlg2').close();toast('Tarea agregada');
 });
 /* Clave de acceso única */
 var AKEY='mpconsultoria_auth_v1',SKEY='mpconsultoria_sesion',unlocked=false,fails=0,lockUntil=0;
@@ -967,6 +1071,7 @@ function restaurar(file){
 }
 document.addEventListener('change',function(ev){
   var id=ev.target.id,fs=ev.target.files;
+  if(ev.target.getAttribute&&ev.target.getAttribute('data-dt')){var tid=ev.target.getAttribute('data-dt'),vv=ev.target.value;guardarDiag(function(o){o.tareas.forEach(function(t){if(String(t.id)===tid)t.estado=vv})});return}
   if(ev.target.getAttribute&&ev.target.getAttribute('data-pest')){S.estPub=S.estPub||{};S.estPub[ev.target.getAttribute('data-pest')]=ev.target.value;save();pintarPL();return}
   if(id==='rf'){var f=fs&&fs[0];ev.target.value='';if(f)restaurar(f)}
   else if(id==='imf'){var l=fs?Array.prototype.slice.call(fs):[];ev.target.value='';if(l.length)importarArchivos(l)}
