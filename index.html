@@ -56,6 +56,19 @@ button{cursor:pointer}
 /* Contenido */
 .main{padding:28px 34px 60px;min-width:0;max-width:1180px}
 .topbar{display:none}
+.tabs{display:flex;gap:6px;margin-bottom:16px}
+.tabs button{background:var(--surf);border:1px solid var(--line);border-radius:10px;padding:8px 14px}
+.tabs button.on{background:var(--acc);color:var(--acc-tx);border-color:var(--acc);font-weight:700}
+.kan{display:grid;grid-template-columns:repeat(5,minmax(190px,1fr));gap:10px;overflow-x:auto;padding-bottom:8px}
+.kcol{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:10px;min-height:120px}
+.kcol h3{font-family:var(--f-d);font-size:15px;margin:2px 4px 10px;display:flex;justify-content:space-between}
+.kc{background:var(--surf2);border-radius:10px;padding:10px;margin-bottom:8px}
+.kc b{display:block;font-size:14px;margin-bottom:6px}
+.kc .acts{margin-top:6px}
+.pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13px;margin:4px 0 10px}
+.vb{display:block!important}
+.vb h3{font-family:var(--f-d);margin:14px 0 4px;font-size:16px}
+.vb audio{width:100%;margin:4px 0 8px}
 .scrim{display:none}
 .ph{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px}
 h1{font-family:var(--f-d);font-size:30px;line-height:1.15;margin:0 0 4px}
@@ -86,7 +99,7 @@ h2{font-family:var(--f-d);font-size:19px;margin:0 0 12px}
 /* Empresas */
 .tools{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
 .tools input{flex:1;min-width:200px}
-input[type=text],input[type=search],input[type=password],select,textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+input[type=text],input[type=search],input[type=password],input[type=date],input[type=time],select,textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
 textarea{resize:vertical;min-height:64px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
 .card{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
@@ -171,6 +184,7 @@ input[type=color]{width:56px;height:38px;padding:2px;background:var(--bg);border
     </div>
   </form>
 </dialog>
+<dialog id="dlg2"><div class="dlg-h"><h2 id="d2t"></h2><button type="button" class="x" data-act="cerrar2" aria-label="Cerrar">&times;</button></div><div class="dlg-b vb" id="d2b"></div></dialog>
 <div class="toast" id="toast" hidden></div>
 <div class="lock" id="lock" hidden></div>
 
@@ -255,7 +269,7 @@ function renderSide(){
     '<div class="menu" id="swMenu" hidden>'+items+(items?'<div class="sep"></div>':'')+'<button type="button" data-act="nueva"><span class="av sm" style="background:var(--acc);color:var(--acc-tx)">+</span><span>Nueva empresa</span></button></div>';
   var cur=route();
   $('#nav').innerHTML=MODS.map(function(m){
-    return '<a href="#'+m.id+'" class="'+(cur===m.id?'on':'')+'">'+svg(m.id)+'<span>'+m.n+'</span>'+(m.d&&m.id!=='ajustes'?'<span class="tag">Etapa 2</span>':'')+'</a>';
+    return '<a href="#'+m.id+'" class="'+(cur===m.id?'on':'')+'">'+svg(m.id)+'<span>'+m.n+'</span>'+(m.d&&m.id!=='ajustes'&&m.id!=='guiones'&&m.id!=='planificador'?'<span class="tag">Etapa 2</span>':'')+'</a>';
   }).join('');
 }
 
@@ -270,7 +284,7 @@ function vInicio(){
       '<span class="row-s">Ficha '+p+'%</span>'+(isA?'<span class="badge">Activa</span>':'<button class="btn sm" data-act="usar" data-id="'+e.id+'">Trabajar con esta</button>')+'</div>';
   }).join('');
   var mods=MODS.filter(function(m){return m.d}).map(function(m){
-    return '<div class="row"><div class="row-main"><div class="row-t"><a href="#'+m.id+'" style="color:inherit">'+m.n+'</a></div><div class="row-s">Viene de '+esc(m.o)+'</div></div><span class="badge mut">'+(m.id==='ajustes'?'En proceso':'Etapa 2')+'</span></div>';
+    return '<div class="row"><div class="row-main"><div class="row-t"><a href="#'+m.id+'" style="color:inherit">'+m.n+'</a></div><div class="row-s">Viene de '+esc(m.o)+'</div></div><span class="badge mut">'+(m.id==='ajustes'?'En proceso':(m.id==='guiones'||m.id==='planificador')?'Listo':'Etapa 2')+'</span></div>';
   }).join('');
   return '<header class="ph"><div><h1>Panel general</h1><p class="sub">Todas tus empresas y herramientas en un solo lugar.</p></div><button class="btn pri" data-act="nueva">Nueva empresa</button></header>'+
     (ultimoResp()?'':'<p class="hint" style="margin:0 0 18px">Aún no has descargado un respaldo. Hazlo en <a href="#ajustes" style="color:var(--acc)">Ajustes</a> para no perder tus datos.</p>')+'<section class="stats"><div class="stat"><b>'+n+'</b><span>Empresas registradas</span></div><div class="stat"><b>'+(a?esc(a.nombre):'-')+'</b><span>Empresa activa</span></div><div class="stat"><b>'+full+' de '+n+'</b><span>Fichas completas</span></div></section>'+
@@ -332,8 +346,10 @@ function vAjustes(){
    '<p class="hint">La clave protege el acceso en este navegador. La sincronización entre equipos llega en la etapa 3.</p>';
 }
 function renderMain(){
-  var r=route(),h=r==='inicio'?vInicio():r==='empresas'?vEmpresas():r==='ajustes'?vAjustes():vModulo(r);
+  var r=route(),h=r==='inicio'?vInicio():r==='empresas'?vEmpresas():r==='ajustes'?vAjustes():r==='guiones'?vGuiones():r==='planificador'?vPlan():vModulo(r);
   $('#main').innerHTML=h;
+  if(r==='guiones')cargarGV();
+  if(r==='planificador')cargarPL();
   var q=$('#q');
   if(q){q.addEventListener('input',function(){filtro=q.value;var pos=q.selectionStart;renderMain();var n=$('#q');n.focus();n.setSelectionRange(pos,pos)})}
 }
@@ -416,6 +432,20 @@ document.addEventListener('click',function(ev){
   else if(act==='cerrar')$('#dlg').close();
   else if(act==='bloquear')bloquear();
   else if(act==='exportar')exportar();
+  else if(act==='ptab'){PL.tab=id;renderMain()}
+  else if(act==='pmes'){movMes(Number(id));pintarPL()}
+  else if(act==='pnueva')formPub(PL.mes?{fecha:''}:null);
+  else if(act==='pedit'){var pe=PLD&&PLD.pubs.filter(function(x){return x.id===id})[0];if(pe)formPub(pe)}
+  else if(act==='pprog'){var ix=PLD&&PLD.ideas[Number(id)];if(ix)formPub({titulo:ix.texto,tipo:TIPOS_PUB.indexOf(ix.tipo)>=0?ix.tipo:'Post',fecha:ix.fecha||''})}
+  else if(act==='pborrar'){if(confirm('¿Eliminar esta publicación?')){S.plan=(S.plan||[]).filter(function(x){return x.id!==id});save();cargarPL()}}
+  else if(act==='gtab'){GV.tab=id;renderMain()}
+  else if(act==='gmover'){var pj=GVD&&GVD.proj.filter(function(x){return x.id===id})[0];if(pj){var ix=ESTADOS.map(function(x){return x[0]}).indexOf(estadoDe(pj))+Number(b.getAttribute('data-d'));if(ix>=0&&ix<5){S.estados=S.estados||{};S.estados[id]=ESTADOS[ix][0];save();pintarGV()}}}
+  else if(act==='gverp')verProyecto(id);
+  else if(act==='gverg')verGuion(Number(id));
+  else if(act==='gnuevo')nuevoGuion();
+  else if(act==='gborrar'){if(confirm('¿Eliminar este guion?')){S.guiones=(S.guiones||[]).filter(function(x){return x.id!==id});save();cargarGV()}}
+  else if(act==='cerrar2')$('#dlg2').close();
+  else if(act==='copiar'){var tx=decodeURIComponent(b.getAttribute('data-t')||'');(navigator.clipboard?navigator.clipboard.writeText(tx):Promise.reject()).then(function(){toast('Copiado')},function(){toast('No se pudo copiar. Selecciona el texto y copia a mano.')})}
   else if(act==='olvide')olvide();
   else if(act==='quitarLogo'){logoTmp='';$('#logoFile').value='';prevLogo()}
   else if(act==='usar'){setActiva(id);var e=S.empresas.filter(function(x){return x.id===id})[0];if(e)toast('Empresa activa: '+e.nombre);document.body.classList.remove('open')}
@@ -439,6 +469,154 @@ $('#scrim').addEventListener('click',function(){document.body.classList.remove('
 window.addEventListener('hashchange',function(){document.body.classList.remove('open');window.scrollTo(0,0);renderAll()});
 document.addEventListener('keydown',function(ev){if(ev.key==='Escape')document.body.classList.remove('open')});
 
+/* Módulo Guiones y voz */
+var GV={tab:'prod'},GVD=null;
+var ESTADOS=[['idea','Idea'],['guion','Guion'],['produccion','Producción'],['listo','Listo'],['publicado','Publicado']];
+function vGuiones(){
+  var a=activa();
+  return '<header class="ph"><div><h1>Guiones y voz</h1><p class="sub">'+(a?'Proyectos y guiones de '+esc(a.nombre)+'.':'Elige una empresa para ver sus guiones.')+'</p></div><button class="btn pri" data-act="gnuevo">Nuevo guion</button></header>'+
+   '<div class="tabs"><button data-act="gtab" data-id="prod" class="'+(GV.tab==='prod'?'on':'')+'">Producción</button><button data-act="gtab" data-id="guiones" class="'+(GV.tab==='guiones'?'on':'')+'">Guiones</button></div><div id="gvBody"><p class="sub">Cargando...</p></div>';
+}
+function cargarGV(){
+  var a=activa();if(!a)return;
+  Promise.all([kvGet('legacy:creadormp'),kvGet('legacy:nadine')]).catch(function(){return [null,null]}).then(function(r){
+    var cm=r[0],nd=r[1],D={proj:[],media:{},scripts:[]};
+    if(cm){
+      var v=cm.vinculos||{};
+      D.proj=(cm.datos.projects||[]).filter(function(p){return v[p.marcaId]===a.id});
+      (cm.datos.media||[]).forEach(function(m){var id=String(m.key||'').split('__')[0];(D.media[id]=D.media[id]||[]).push(m)});
+    }
+    if(nd){
+      var vn=nd.vinculos||{};
+      (nd.datos.workspaces||[]).forEach(function(w){if(vn[w.id]===a.id)(w.scripts||[]).forEach(function(x){D.scripts.push({id:x.id,titulo:x.title,plataforma:x.platform,gancho:x.hook,cuerpo:x.body,cta:x.cta,texto:x.caption,origen:'Nadine'})})});
+    }
+    (S.guiones||[]).filter(function(g){return g.empresa===a.id}).forEach(function(g){D.scripts.unshift(g)});
+    GVD=D;pintarGV();
+  });
+}
+function estadoDe(p){var e=(S.estados||{})[p.id]||p.estado;return ESTADOS.some(function(x){return x[0]===e})?e:'idea'}
+function pintarGV(){
+  var b=$('#gvBody');if(!b||!GVD)return;
+  if(GV.tab==='prod'){
+    if(!GVD.proj.length){b.innerHTML='<div class="empty"><b>Sin proyectos</b>Esta empresa no tiene proyectos de producción importados.</div>';return}
+    b.innerHTML='<div class="kan">'+ESTADOS.map(function(es,i){
+      var ps=GVD.proj.filter(function(p){return estadoDe(p)===es[0]});
+      return '<div class="kcol"><h3>'+es[1]+'<span class="row-s">'+ps.length+'</span></h3>'+ps.map(function(p){
+        return '<div class="kc"><b>'+esc(p.titulo)+'</b><div class="row-s">'+esc(p.tipo||'')+(p.duracion?' · '+p.duracion+' s':'')+'</div><div class="acts">'+
+          (i>0?'<button class="btn sm" data-act="gmover" data-id="'+esc(p.id)+'" data-d="-1" aria-label="Mover atrás">&larr;</button>':'')+
+          '<button class="btn sm" data-act="gverp" data-id="'+esc(p.id)+'">Abrir</button>'+
+          (i<4?'<button class="btn sm" data-act="gmover" data-id="'+esc(p.id)+'" data-d="1" aria-label="Mover adelante">&rarr;</button>':'')+'</div></div>';
+      }).join('')+'</div>';
+    }).join('')+'</div>';
+  }else{
+    if(!GVD.scripts.length){b.innerHTML='<div class="empty"><b>Sin guiones</b>Crea uno con "Nuevo guion" o importa tus respaldos en Ajustes.</div>';return}
+    b.innerHTML='<div class="grid">'+GVD.scripts.map(function(g,i){
+      return '<article class="card"><div><div class="row-t">'+esc(g.titulo)+'</div><div class="row-s">'+esc(g.plataforma||'')+(g.origen?' · '+g.origen:' · Creado aquí')+'</div></div><div class="row-s">'+esc((g.gancho||'').slice(0,140))+'</div><div class="acts"><button class="btn sm pri" data-act="gverg" data-id="'+i+'">Abrir</button>'+(g.origen?'':'<button class="btn sm del" data-act="gborrar" data-id="'+esc(g.id)+'">Eliminar</button>')+'</div></article>';
+    }).join('')+'</div>';
+  }
+}
+function cp(t,l){return '<button class="btn sm" data-act="copiar" data-t="'+encodeURIComponent(t||'')+'">'+(l||'Copiar')+'</button>'}
+function bloque(t,x){return x?'<h3>'+t+' '+cp(x)+'</h3><div class="pre">'+esc(x)+'</div>':''}
+function abrirD2(t,h){$('#d2t').textContent=t;$('#d2b').innerHTML=h;$('#dlg2').showModal()}
+function verProyecto(id){
+  var p=GVD.proj.filter(function(x){return x.id===id})[0];if(!p)return;
+  var r=p.resultado||{},k=r.kit||{},h='';
+  h+=bloque('Gancho',r.gancho)+bloque('Personaje y ambiente (ancla visual)',r.ancla_visual);
+  (r.escenas||[]).forEach(function(e){
+    h+='<h3>Escena '+esc(e.n)+(e.duracion?' · '+e.duracion+' s':'')+'</h3>'+bloque('Locución',e.locucion)+bloque('Texto en pantalla',e.texto_pantalla)+bloque('Visual',e.visual)+bloque('Prompt de video',e.prompt_veo)+bloque('Prompt de imagen',e.prompt_imagen);
+  });
+  if(r.cta)h+=bloque('Llamado a la acción',r.cta);
+  h+=bloque('Título para publicar',k.titulo)+bloque('Descripción',k.descripcion)+bloque('Hashtags',(k.hashtags||[]).join(' '))+bloque('Comentario fijado',k.comentario_fijado);
+  var au=GVD.media[p.id]||[];
+  if(au.length){h+='<h3>Voces generadas</h3>'+au.map(function(m){return '<div class="row-s">'+esc(m.voice||'')+(m.fecha?' · '+esc(fmtFecha(new Date(m.fecha))):'')+'</div><audio controls preload="none" src="'+esc(m.data)+'"></audio>'}).join('')}
+  abrirD2(p.titulo,h||'<p class="sub">Este proyecto aún no tiene guion generado.</p>');
+}
+function verGuion(i){
+  var g=GVD.scripts[i];if(!g)return;
+  var todo=[g.titulo,g.gancho,g.cuerpo,g.cta].filter(Boolean).join('\n\n');
+  abrirD2(g.titulo,'<div class="row-s">'+esc(g.plataforma||'')+'</div><p>'+cp(todo,'Copiar guion completo')+'</p>'+bloque('Gancho',g.gancho)+bloque('Guion',g.cuerpo)+bloque('Llamado a la acción',g.cta)+bloque('Texto para publicar',g.texto));
+}
+function nuevoGuion(){
+  if(!activa())return toast('Primero elige una empresa.');
+  abrirD2('Nuevo guion','<form id="frmG" class="pw" style="max-width:none"><div class="f"><label for="g1">Título</label><input type="text" id="g1" required></div><div class="f"><label for="g2">Plataforma</label><input type="text" id="g2" placeholder="Instagram, TikTok, radio..."></div><div class="f"><label for="g3">Gancho</label><textarea id="g3"></textarea></div><div class="f"><label for="g4">Guion</label><textarea id="g4" style="min-height:140px"></textarea></div><div class="f"><label for="g5">Llamado a la acción</label><input type="text" id="g5"></div><div><button type="submit" class="btn pri">Guardar guion</button></div></form>');
+}
+document.addEventListener('submit',function(ev){
+  if(ev.target.id!=='frmG')return;
+  ev.preventDefault();
+  var a=activa();if(!a)return;
+  S.guiones=S.guiones||[];
+  S.guiones.push({id:uid(),empresa:a.id,titulo:$('#g1').value.trim(),plataforma:$('#g2').value.trim(),gancho:$('#g3').value.trim(),cuerpo:$('#g4').value.trim(),cta:$('#g5').value.trim()});
+  save();$('#dlg2').close();GV.tab='guiones';renderMain();toast('Guion guardado');
+});
+/* Módulo Planificador */
+var hoy=new Date(),PL={tab:'pub',mes:hoy.getFullYear()+'-'+('0'+(hoy.getMonth()+1)).slice(-2)},PLD=null;
+var TIPOS_PUB=['Post','Reel','Historia','Carrusel','Video','TikTok'],EST_PUB=['idea','programado','publicado'];
+function nombreMes(m){var x=m.split('-');var t=new Date(Number(x[0]),Number(x[1])-1,1).toLocaleDateString('es-CO',{month:'long',year:'numeric'});return t.charAt(0).toUpperCase()+t.slice(1)}
+function movMes(d){var x=PL.mes.split('-'),f=new Date(Number(x[0]),Number(x[1])-1+d,1);PL.mes=f.getFullYear()+'-'+('0'+(f.getMonth()+1)).slice(-2)}
+function vPlan(){
+  var a=activa();
+  return '<header class="ph"><div><h1>Planificador</h1><p class="sub">'+(a?'Publicaciones e ideas de '+esc(a.nombre)+'.':'Elige una empresa para ver su calendario.')+'</p></div><button class="btn pri" data-act="pnueva">Nueva publicación</button></header>'+
+   '<div class="tabs"><button data-act="ptab" data-id="pub" class="'+(PL.tab==='pub'?'on':'')+'">Publicaciones</button><button data-act="ptab" data-id="ideas" class="'+(PL.tab==='ideas'?'on':'')+'">Ideas</button></div><div id="plBody"><p class="sub">Cargando...</p></div>';
+}
+function cargarPL(){
+  var a=activa();if(!a)return;
+  kvGet('legacy:nadine').catch(function(){return null}).then(function(nd){
+    var D={pubs:[],ideas:[]};
+    if(nd){
+      var v=nd.vinculos||{};
+      (nd.datos.workspaces||[]).forEach(function(w){
+        if(v[w.id]!==a.id)return;
+        (w.content||[]).forEach(function(x){D.pubs.push({id:x.id,titulo:x.title,tipo:x.type,estado:x.status,fecha:x.date,hora:x.time,vistas:Number(x.views)||0,notas:x.notes,origen:true})});
+        (w.ideas||[]).forEach(function(x){D.ideas.push({texto:x.text,plat:x.plat,tipo:x.type,fecha:x.date})});
+      });
+    }
+    (S.plan||[]).filter(function(x){return x.empresa===a.id}).forEach(function(x){D.pubs.push(x)});
+    PLD=D;pintarPL();
+  });
+}
+function estPub(x){return (S.estPub||{})[x.id]||x.estado||'idea'}
+function pintarPL(){
+  var b=$('#plBody');if(!b||!PLD)return;
+  if(PL.tab==='ideas'){
+    b.innerHTML=PLD.ideas.length?'<div class="grid">'+PLD.ideas.map(function(x,i){return '<article class="card"><div class="row-t">'+esc(x.texto)+'</div><div class="row-s">'+esc([x.plat,x.tipo,x.fecha].filter(Boolean).join(' · '))+'</div><div class="acts"><button class="btn sm pri" data-act="pprog" data-id="'+i+'">Programar</button>'+cp(x.texto)+'</div></article>'}).join('')+'</div>':'<div class="empty"><b>Sin ideas</b>Esta empresa no tiene ideas guardadas.</div>';
+    return;
+  }
+  var mes=PLD.pubs.filter(function(x){return (x.fecha||'').indexOf(PL.mes)===0}),sin=PLD.pubs.filter(function(x){return !x.fecha});
+  var pub=mes.filter(function(x){return estPub(x)==='publicado'}).length,prog=mes.filter(function(x){return estPub(x)==='programado'}).length,vis=mes.reduce(function(t,x){return t+(x.vistas||0)},0);
+  var dias={};mes.forEach(function(x){(dias[x.fecha]=dias[x.fecha]||[]).push(x)});
+  function fila(x){
+    return '<div class="row"><div class="row-main"><div class="row-t">'+esc(x.titulo)+'</div><div class="row-s">'+esc(x.tipo||'')+(x.hora?' · '+esc(x.hora):'')+(x.vistas?' · '+x.vistas+' vistas':'')+(x.notas?' · '+esc(x.notas):'')+'</div></div>'+
+     '<select data-pest="'+esc(x.id)+'" style="width:auto" aria-label="Estado">'+EST_PUB.map(function(e){return '<option'+(e===estPub(x)?' selected':'')+'>'+e+'</option>'}).join('')+'</select>'+
+     (x.origen?'':'<button class="btn sm" data-act="pedit" data-id="'+esc(x.id)+'">Editar</button><button class="btn sm del" data-act="pborrar" data-id="'+esc(x.id)+'">Eliminar</button>')+'</div>';
+  }
+  var lista=Object.keys(dias).sort().map(function(f){
+    var d=new Date(f+'T12:00:00');
+    return '<h3 class="row-s" style="margin:14px 0 4px">'+esc(d.toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'long'}))+'</h3><div class="panel">'+dias[f].sort(function(a,b2){return (a.hora||'').localeCompare(b2.hora||'')}).map(fila).join('')+'</div>';
+  }).join('');
+  b.innerHTML='<div class="ph" style="margin-bottom:12px"><div class="tabs" style="margin:0"><button data-act="pmes" data-id="-1" aria-label="Mes anterior">&larr;</button><button class="on" style="min-width:160px">'+esc(nombreMes(PL.mes))+'</button><button data-act="pmes" data-id="1" aria-label="Mes siguiente">&rarr;</button></div></div>'+
+   '<section class="stats" style="grid-template-columns:repeat(4,1fr)"><div class="stat"><b>'+mes.length+'</b><span>Publicaciones del mes</span></div><div class="stat"><b>'+pub+'</b><span>Publicadas</span></div><div class="stat"><b>'+prog+'</b><span>Programadas</span></div><div class="stat"><b>'+vis+'</b><span>Vistas</span></div></section>'+
+   (lista||'<div class="empty"><b>Nada este mes</b>Crea una publicación o cambia de mes.</div>')+
+   (sin.length?'<h3 class="row-s" style="margin:14px 0 4px">Sin fecha</h3><div class="panel">'+sin.map(fila).join('')+'</div>':'');
+}
+function formPub(x){
+  x=x||{};
+  abrirD2(x.id?'Editar publicación':'Nueva publicación','<form id="frmP" class="pw" style="max-width:none"><input type="hidden" id="p0" value="'+esc(x.id||'')+'"><div class="f"><label for="p1">Título o idea</label><input type="text" id="p1" required value="'+esc(x.titulo||'')+'"></div>'+
+   '<div class="f"><label for="p2">Tipo</label><select id="p2">'+TIPOS_PUB.map(function(t){return '<option'+(t===x.tipo?' selected':'')+'>'+t+'</option>'}).join('')+'</select></div>'+
+   '<div class="f"><label for="p3">Fecha</label><input type="date" id="p3" value="'+esc(x.fecha||'')+'"></div><div class="f"><label for="p4">Hora</label><input type="time" id="p4" value="'+esc(x.hora||'')+'"></div>'+
+   '<div class="f"><label for="p5">Estado</label><select id="p5">'+EST_PUB.map(function(t){return '<option'+(t===(x.estado||'programado')?' selected':'')+'>'+t+'</option>'}).join('')+'</select></div>'+
+   '<div class="f"><label for="p6">Notas</label><textarea id="p6">'+esc(x.notas||'')+'</textarea></div><div><button type="submit" class="btn pri">Guardar publicación</button></div></form>');
+}
+document.addEventListener('submit',function(ev){
+  if(ev.target.id!=='frmP')return;
+  ev.preventDefault();
+  var a=activa();if(!a)return;
+  S.plan=S.plan||[];
+  var id=$('#p0').value,o={empresa:a.id,titulo:$('#p1').value.trim(),tipo:$('#p2').value,fecha:$('#p3').value,hora:$('#p4').value,estado:$('#p5').value,notas:$('#p6').value.trim()};
+  var e=id?S.plan.filter(function(x){return x.id===id})[0]:null;
+  if(e){for(var k in o)e[k]=o[k]}else{o.id=uid();S.plan.push(o)}
+  if(o.fecha)PL.mes=o.fecha.slice(0,7);
+  save();$('#dlg2').close();PL.tab='pub';renderMain();toast('Publicación guardada');
+});
 /* Clave de acceso única */
 var AKEY='mpconsultoria_auth_v1',SKEY='mpconsultoria_sesion',unlocked=false,fails=0,lockUntil=0;
 function getAuth(){try{return JSON.parse(localStorage.getItem(AKEY))}catch(e){return null}}
@@ -789,6 +967,7 @@ function restaurar(file){
 }
 document.addEventListener('change',function(ev){
   var id=ev.target.id,fs=ev.target.files;
+  if(ev.target.getAttribute&&ev.target.getAttribute('data-pest')){S.estPub=S.estPub||{};S.estPub[ev.target.getAttribute('data-pest')]=ev.target.value;save();pintarPL();return}
   if(id==='rf'){var f=fs&&fs[0];ev.target.value='';if(f)restaurar(f)}
   else if(id==='imf'){var l=fs?Array.prototype.slice.call(fs):[];ev.target.value='';if(l.length)importarArchivos(l)}
 });
