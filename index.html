@@ -300,7 +300,19 @@ function vModulo(id){
   var m=MODS.filter(function(x){return x.id===id})[0],a=activa();
   return '<header class="ph"><div><h1>'+m.n+'</h1><p class="sub">'+esc(m.d)+'</p></div><span class="badge mut">Llega en la etapa 2</span></header>'+
     '<div class="panel"><div class="row">'+av(a)+'<div class="row-main"><div class="row-t">'+(a?esc(a.nombre):'Sin empresa activa')+'</div><div class="row-s">'+(a?'Este módulo trabajará con '+esc(m.u)+'.':'Registra o elige una empresa para empezar.')+'</div></div>'+(a?'<button class="btn sm" data-act="editar" data-id="'+a.id+'">Editar ficha</button>':'<button class="btn sm pri" data-act="nueva">Nueva empresa</button>')+'</div>'+
+    (SRC_MOD[id]||[]).map(function(k){var im=(S.imports||{})[k];return im?'<div class="row"><div class="row-main"><div class="row-s">Datos de '+FUENTES[k].n+' ya importados: '+esc(im.resumen)+'. Estarán disponibles al activar este módulo.</div></div><span class="badge ok">Importado</span></div>':''}).join('')+
     '<div class="row"><div class="row-main"><div class="row-s">Se traslada desde '+esc(m.o)+'. Cuando la base esté lista, este módulo se integra aquí con todos sus datos.</div></div></div></div>';
+}
+function filasFuentes(){
+  return Object.keys(FUENTES).map(function(k){
+    var im=(S.imports||{})[k],f=FUENTES[k];
+    return '<div class="row"><div class="row-main"><div class="row-t">'+f.n+'</div><div class="row-s">'+(im?esc(im.resumen)+'. Importado el '+esc(fmtFecha(new Date(im.fecha)))+' ('+esc(im.archivo)+').':esc(f.d)+'. Aún sin importar.')+'</div></div>'+(im?'<span class="badge ok">Importado</span>':'<span class="badge mut">Pendiente</span>')+'</div>';
+  }).join('');
+}
+function informeHtml(){
+  var i=S.informe;
+  if(!i||!i.length)return '';
+  return '<div class="hint" style="margin:0 0 18px"><b style="color:var(--tx)">Resultado de la última importación</b><br>'+i.map(esc).join('<br>')+'</div>';
 }
 function vAjustes(){
   var u=ultimoResp();
@@ -313,7 +325,10 @@ function vAjustes(){
    '<h2>Respaldo</h2><div class="panel">'+
    '<div class="row"><div class="row-main"><div class="row-t">Exportar respaldo</div><div class="row-s">Descarga un archivo con todas tus empresas y logos. '+(u?'Último respaldo: '+esc(fmtFecha(u))+'.':'Aún no has descargado ningún respaldo.')+'</div></div><button class="btn pri" data-act="exportar">Descargar respaldo</button></div>'+
    '<div class="row"><div class="row-main"><div class="row-t">Restaurar respaldo</div><div class="row-s">Reemplaza los datos actuales por los del archivo. La clave de este navegador no cambia.</div></div><label class="btn" for="rf" style="cursor:pointer">Elegir archivo</label><input type="file" id="rf" accept=".json,application/json" hidden></div></div>'+
-   '<p class="hint">La clave protege el acceso en este navegador. La importación de datos de las apps anteriores y la sincronización entre equipos llegan en las siguientes tareas.</p>';
+   '<h2>Importar datos de las apps anteriores</h2><div class="panel">'+filasFuentes()+
+   '<div class="row"><div class="row-main"><div class="row-t">Importar respaldos</div><div class="row-s">Elige los archivos .json de tus apps; puedes seleccionar varios a la vez. Las empresas se unen por nombre y solo se llenan los datos vacíos de cada ficha. El contenido original se conserva completo para los módulos.</div></div><label class="btn pri" for="imf" style="cursor:pointer">Elegir archivos</label><input type="file" id="imf" accept=".json,application/json" multiple hidden></div></div>'+
+   informeHtml()+
+   '<p class="hint">La clave protege el acceso en este navegador. La sincronización entre equipos llega en la etapa 3.</p>';
 }
 function renderMain(){
   var r=route(),h=r==='inicio'?vInicio():r==='empresas'?vEmpresas():r==='ajustes'?vAjustes():vModulo(r);
@@ -498,7 +513,8 @@ function bloquear(){
 function olvide(){
   if(!confirm('Si no recuerdas la clave, se borrarán TODAS las empresas y datos de este navegador y podrás crear una clave nueva. ¿Continuar?'))return;
   try{localStorage.removeItem(KEY);localStorage.removeItem(AKEY);sessionStorage.removeItem(SKEY)}catch(e){}
-  S={empresas:[],activa:null};
+  S={empresas:[],activa:null,imports:{}};
+  kvDelPrefix('legacy:').catch(function(){});
   showLock('setup');
 }
 function cambiarClave(ev){
@@ -518,20 +534,220 @@ function cambiarClave(ev){
 }
 document.addEventListener('submit',function(ev){if(ev.target.id==='frmClave')cambiarClave(ev)});
 
-/* Respaldo único */
+/* Almacén grande (IndexedDB) para los datos originales de las apps anteriores */
+var DBP=null;
+function db(){
+  if(!DBP)DBP=new Promise(function(res,rej){
+    if(!window.indexedDB)return rej(new Error('sin-idb'));
+    var r=indexedDB.open('mpconsultoria',1);
+    r.onupgradeneeded=function(){r.result.createObjectStore('kv')};
+    r.onsuccess=function(){res(r.result)};
+    r.onerror=function(){rej(r.error)};
+  });
+  return DBP;
+}
+function kvSet(k,v){return db().then(function(d){return new Promise(function(res,rej){var t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=function(){res()};t.onerror=function(){rej(t.error)};t.onabort=function(){rej(t.error)}})})}
+function kvGet(k){return db().then(function(d){return new Promise(function(res,rej){var q=d.transaction('kv','readonly').objectStore('kv').get(k);q.onsuccess=function(){res(q.result)};q.onerror=function(){rej(q.error)}})})}
+function kvAll(){return db().then(function(d){return new Promise(function(res,rej){var out={},q=d.transaction('kv','readonly').objectStore('kv').openCursor();q.onsuccess=function(){var c=q.result;if(c){out[c.key]=c.value;c.continue()}else res(out)};q.onerror=function(){rej(q.error)}})})}
+function kvDelPrefix(pref){return db().then(function(d){return new Promise(function(res,rej){var t=d.transaction('kv','readwrite'),q=t.objectStore('kv').openCursor();q.onsuccess=function(){var c=q.result;if(c){if(String(c.key).indexOf(pref)===0)c.delete();c.continue()}};t.oncomplete=function(){res()};t.onerror=function(){rej(t.error)};t.onabort=function(){rej(t.error)}})})}
+
+/* Importar respaldos de las apps anteriores */
+var FUENTES={
+  creadormp:{n:'CreadorMP',d:'Panel de producción, guiones y voz'},
+  nadine:{n:'Nadine',d:'Contenido y redes'},
+  campanas:{n:'Estudio de Campañas',d:'Carruseles, historias y posts'},
+  hmpi:{n:'HMPI Pro',d:'Diagnóstico y estrategia'}
+};
+var SRC_MOD={diagnostico:['hmpi'],planificador:['nadine'],guiones:['creadormp'],diseno:['campanas'],comparativo:['nadine','hmpi']};
+function norm(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'')}
+function lev(a,b){
+  var m=a.length,n=b.length,i,j,p=[],c;
+  for(j=0;j<=n;j++)p[j]=j;
+  for(i=1;i<=m;i++){var prev=p[0];p[0]=i;for(j=1;j<=n;j++){c=p[j];p[j]=Math.min(p[j]+1,p[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=c}}
+  return p[n];
+}
+function buscarEmpresa(nombre){
+  var a=norm(nombre);if(!a)return null;
+  var i,e,b;
+  for(i=0;i<S.empresas.length;i++){if(norm(S.empresas[i].nombre)===a)return S.empresas[i]}
+  for(i=0;i<S.empresas.length;i++){
+    e=S.empresas[i];b=norm(e.nombre);
+    if(Math.min(a.length,b.length)>=5&&(a.indexOf(b)===0||b.indexOf(a)===0))return e;
+    if(Math.min(a.length,b.length)>=6&&lev(a,b)<=Math.max(1,Math.floor(Math.max(a.length,b.length)*0.12)))return e;
+  }
+  return null;
+}
+function mapTipo(t){
+  var x=norm(t);if(!x)return '';
+  var r=[['Cafetería',['caf']],['Restaurante',['restaur','gastro','comida','lechona','tamal','asadero']],['Artesanal',['artesan','vela','manualid']],['Tienda de ropa',['ropa','moda','boutique']],['Belleza y estética',['belleza','estetic','peluquer']],['Salud y bienestar',['salud','bienestar','fitness','gimnasio']],['Streaming y tecnología',['streaming','tecnolog']],['Educación',['educa','curso','academia']],['Servicios profesionales',['consult','asesor']],['Comercio local',['local','comercio','tienda']]];
+  for(var i=0;i<r.length;i++){for(var j=0;j<r[i][1].length;j++){if(x.indexOf(r[i][1][j])>=0)return r[i][0]}}
+  return '';
+}
+function mapTono(t){
+  var x=norm(t);if(!x)return '';
+  for(var i=0;i<TONOS.length;i++){if(norm(TONOS[i])===x)return TONOS[i]}
+  if(/cerc|calid/.test(x))return 'Cercano';
+  if(/profes/.test(x))return 'Profesional';
+  if(/diver|alegr|humor/.test(x))return 'Divertido';
+  if(/elegan|sofist/.test(x))return 'Elegante';
+  if(/famil/.test(x))return 'Familiar';
+  return '';
+}
+function arroba(u){u=String(u||'').trim();if(!u)return '';return /^(@|https?:)/i.test(u)?u:'@'+u}
+function lineas(arr){return arr.filter(function(x){return x[1]&&String(x[1]).trim()}).map(function(x){return x[0]+': '+String(x[1]).trim()}).join('\n')}
+function str(v){return typeof v==='string'?v.trim():''}
+
+function detectar(d){
+  if(!d||typeof d!=='object')return '';
+  if(d.app==='MPCONSULTORIA')return 'mp';
+  if(Array.isArray(d.workspaces)&&d.user)return 'nadine';
+  if(Array.isArray(d.brands)&&Array.isArray(d.projects))return 'creadormp';
+  if(d.D&&typeof d.D==='object'&&d.BM)return 'hmpi';
+  if(Array.isArray(d.list))return 'campanas';
+  return '';
+}
+function extraer(tipo,d){
+  var out=[];
+  if(tipo==='nadine'){
+    d.workspaces.forEach(function(w){
+      var n=w.niche||{};
+      out.push({key:w.id,logo:w.logo,f:{nombre:str(w.name),color:str(w.color),ciudad:str(n.city),productos:str(n.products)||str(n.keywords),diferenciales:str(n.diff),publico:str(n.audience),tono:mapTono(n.tone),tipo:mapTipo(n.sector),instagram:arroba(n.instagram),whatsapp:str(n.whatsapp),
+        notas:lineas([['Horario',n.schedule],['Pagos',n.payment],['Domicilios',n.delivery],['Web',n.web],['Promoción',n.promo]])}});
+    });
+  }else if(tipo==='creadormp'){
+    d.brands.forEach(function(b){
+      out.push({key:b.id,logo:b.logo,f:{nombre:str(b.nombre),tipo:mapTipo(b.nicho),publico:str(b.publico),tono:mapTono(b.tono),color:str(b.color),productos:str(b.productos),whatsapp:str(b.contacto),
+        notas:lineas([['Oferta',b.oferta],['Llamado a la acción',b.cta],['Hashtags',b.hashtags]])}});
+    });
+  }else if(tipo==='hmpi'){
+    Object.keys(d.D).forEach(function(k){
+      var x=d.D[k]||{},pl=x.plat||{},g=function(o){return o&&o.usr?String(o.usr):''};
+      out.push({key:k,logo:x.logo,f:{nombre:str(x.name)||k,tipo:mapTipo(x.sector),instagram:arroba(g(pl.ig)||x.redes),facebook:g(pl.fb),tiktok:g(pl.tt),whatsapp:str(x.tel),notas:lineas([['Nota de diagnóstico',x.notas]])}});
+    });
+  }else if(tipo==='campanas'){
+    d.list.forEach(function(w){
+      var ws=w.ws||{},br=ws.brand||{},pr=ws.prof||{};
+      var plantilla=norm(w.name)==='tumarca'&&norm(br.handle)==='tumarca'&&!br.logo&&!pr.p&&!pr.d&&!pr.u;
+      if(plantilla||!str(w.name))return;
+      out.push({key:w.id,logo:br.logo,f:{nombre:str(w.name),instagram:arroba(br.handle),productos:str(pr.p),diferenciales:str(pr.d),publico:str(pr.u),tono:mapTono(pr.tn)}});
+    });
+  }
+  return out;
+}
+function resumen(tipo,d){
+  var suma=function(a,k){return (a||[]).reduce(function(t,x){return t+((x&&x[k]&&x[k].length)||0)},0)};
+  if(tipo==='nadine')return d.workspaces.length+' empresas, '+suma(d.workspaces,'scripts')+' guiones, '+suma(d.workspaces,'content')+' publicaciones, '+suma(d.workspaces,'ideas')+' ideas, '+suma(d.workspaces,'flows')+' automatizaciones';
+  if(tipo==='creadormp')return d.brands.length+' marcas, '+d.projects.length+' proyectos, '+(d.media||[]).length+' audios y medios';
+  if(tipo==='hmpi')return Object.keys(d.D).length+' empresas con diagnóstico y tareas';
+  return d.list.length+' espacios de diseño';
+}
+function reducirLogo(src){
+  return new Promise(function(res){
+    if(typeof src!=='string'||src.indexOf('data:image/')!==0)return res('');
+    var done=false,fin=function(v){if(!done){done=true;res(v)}};
+    setTimeout(function(){fin('')},5000);
+    var im=new Image();
+    im.onload=function(){
+      try{
+        var M=256,r=Math.min(1,M/Math.max(im.width,im.height)),c=document.createElement('canvas');
+        c.width=Math.max(1,Math.round(im.width*r));c.height=Math.max(1,Math.round(im.height*r));
+        c.getContext('2d').drawImage(im,0,0,c.width,c.height);fin(c.toDataURL('image/png'));
+      }catch(e){fin('')}
+    };
+    im.onerror=function(){fin('')};
+    im.src=src;
+  });
+}
+var COL_BASE=['#f5b83d','#c98a4b','#d9482b','#3f8f5a','#3b82c4'];
+function aplicar(e,f){
+  var ch=0;
+  Object.keys(f).forEach(function(k){
+    var v=f[k];if(!v||k==='nombre')return;
+    if(k==='notas'){
+      if(!e.notas){e.notas=v;ch++}
+      else if(e.notas.indexOf(v)<0){e.notas=e.notas+'\n'+v;ch++}
+      return;
+    }
+    var vacio=!e[k]||(k==='tipo'&&e[k]==='Otro')||(k==='color'&&COL_BASE.indexOf(e[k])>=0)||(k==='ciudad'&&e[k]==='Caldas');
+    if(vacio&&e[k]!==v){e[k]=v;ch++}
+  });
+  return ch;
+}
+function importarUno(it){
+  var tipo=it.tipo,d=it.d,fichas=extraer(tipo,d),vinc={},cre=0,act=0,chain=Promise.resolve();
+  fichas.forEach(function(x){
+    chain=chain.then(function(){
+      var e=buscarEmpresa(x.f.nombre),nueva=false;
+      if(!e){e=blank({nombre:x.f.nombre});nueva=true}
+      var t=(x.logo&&!e.logo)?reducirLogo(x.logo):Promise.resolve('');
+      return t.then(function(lg){
+        if(lg)x.f.logo=lg;
+        var n=aplicar(e,x.f);
+        if(nueva){S.empresas.push(e);cre++}else if(n>0)act++;
+        if(!S.activa)S.activa=e.id;
+        vinc[x.key]=e.id;
+      });
+    });
+  });
+  return chain.then(function(){
+    return kvSet('legacy:'+tipo,{fuente:tipo,archivo:it.f.name,importado:Date.now(),vinculos:vinc,datos:d});
+  }).then(function(){
+    var rs=resumen(tipo,d);
+    S.imports=S.imports||{};
+    S.imports[tipo]={fecha:Date.now(),archivo:it.f.name,resumen:rs,creadas:cre,actualizadas:act};
+    return FUENTES[tipo].n+': '+rs+'. Empresas nuevas: '+cre+'. Fichas completadas: '+act+'.';
+  });
+}
+function leerJSON(f){
+  return new Promise(function(res,rej){
+    var rd=new FileReader();
+    rd.onerror=function(){rej(new Error('lectura'))};
+    rd.onload=function(){try{res(JSON.parse(rd.result))}catch(e){rej(new Error('json'))}};
+    rd.readAsText(f);
+  });
+}
+var importando=false;
+function importarArchivos(files){
+  if(importando)return toast('Ya hay una importación en curso.');
+  var lista=Array.prototype.slice.call(files);if(!lista.length)return;
+  importando=true;toast('Importando '+lista.length+' archivo'+(lista.length>1?'s':'')+'...');
+  Promise.all(lista.map(function(f){
+    return leerJSON(f).then(function(d){return {f:f,d:d,tipo:detectar(d)}},function(){return {f:f,tipo:'',err:'no es un archivo JSON válido.'}});
+  })).then(function(items){
+    var orden={mp:0,nadine:1,creadormp:2,hmpi:3,campanas:4};
+    items.sort(function(a,b){return (orden[a.tipo]||9)-(orden[b.tipo]||9)});
+    var inf=[],chain=Promise.resolve();
+    items.forEach(function(it){
+      chain=chain.then(function(){
+        if(it.err){inf.push(it.f.name+': '+it.err);return}
+        if(!it.tipo){inf.push(it.f.name+': no reconozco este archivo. Usa los respaldos de CreadorMP, Nadine, Estudio de Campañas o HMPI Pro.');return}
+        if(it.tipo==='mp'){inf.push(it.f.name+': es un respaldo de MPCONSULTORIA. Usa "Restaurar respaldo".');return}
+        return importarUno(it).then(function(m){inf.push(m)},function(){inf.push(it.f.name+': no se pudo guardar en este navegador (almacenamiento bloqueado o lleno).')});
+      });
+    });
+    return chain.then(function(){S.informe=inf;save();importando=false;renderAll();toast('Importación terminada')});
+  }).catch(function(){importando=false;toast('No se pudo completar la importación.')});
+}
+
+/* Respaldo único (empresas + datos importados) */
 var BKEY='mpconsultoria_ultimo_respaldo';
 function ultimoResp(){try{var t=localStorage.getItem(BKEY);return t?new Date(t):null}catch(e){return null}}
 function fmtFecha(d){return d.toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'})+', '+d.toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit'})}
 function exportar(){
-  var now=new Date();
-  var data={app:'MPCONSULTORIA',version:1,fecha:now.toISOString(),datos:{empresas:S.empresas,activa:S.activa}};
-  var blob=new Blob([JSON.stringify(data)],{type:'application/json'});
-  var url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download='mpconsultoria-respaldo-'+now.toISOString().slice(0,10)+'.json';
-  document.body.appendChild(a);a.click();a.remove();
-  setTimeout(function(){URL.revokeObjectURL(url)},1500);
-  try{localStorage.setItem(BKEY,now.toISOString())}catch(e){}
-  toast('Respaldo descargado');renderMain();
+  var now=new Date(),falloIdb=false;
+  kvAll().catch(function(){falloIdb=true;return {}}).then(function(all){
+    var legacy={};
+    Object.keys(all).forEach(function(k){if(k.indexOf('legacy:')===0)legacy[k.slice(7)]=all[k]});
+    var data={app:'MPCONSULTORIA',version:2,fecha:now.toISOString(),datos:{empresas:S.empresas,activa:S.activa,imports:S.imports||{},legacy:legacy}};
+    var blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+    var url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download='mpconsultoria-respaldo-'+now.toISOString().slice(0,10)+'.json';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(url)},1500);
+    try{localStorage.setItem(BKEY,now.toISOString())}catch(e){}
+    toast(falloIdb&&S.imports&&Object.keys(S.imports).length?'Respaldo descargado, pero sin los datos importados (el navegador no los dejó leer).':'Respaldo descargado');
+    renderMain();
+  });
 }
 function limpiarEmpresa(x){
   var o={};
@@ -555,17 +771,27 @@ function restaurar(file){
       while(seen[e.id])e.id=uid();
       seen[e.id]=1;em.push(e);
     });
+    var lg=d.datos.legacy&&typeof d.datos.legacy==='object'?d.datos.legacy:null;
     var f=d.fecha?new Date(d.fecha):null,ft=f&&!isNaN(f)?' del '+fmtFecha(f):'';
-    if(!confirm('Se reemplazarán las '+S.empresas.length+' empresas actuales por las '+em.length+' del respaldo'+ft+'. ¿Continuar?'))return;
+    if(!confirm('Se reemplazarán las '+S.empresas.length+' empresas actuales por las '+em.length+' del respaldo'+ft+(lg?', junto con los datos importados de las apps anteriores':'')+'. ¿Continuar?'))return;
     S.empresas=em;
     S.activa=seen[d.datos.activa]?d.datos.activa:(em.length?em[0].id:null);
-    save();renderAll();toast('Respaldo restaurado: '+em.length+' empresas');
+    var p=Promise.resolve();
+    if(lg){
+      S.imports=d.datos.imports&&typeof d.datos.imports==='object'?d.datos.imports:{};
+      p=kvDelPrefix('legacy:').then(function(){return Promise.all(Object.keys(lg).map(function(k){return kvSet('legacy:'+k,lg[k])}))});
+    }
+    p.then(function(){save();renderAll();toast('Respaldo restaurado: '+em.length+' empresas')},
+           function(){save();renderAll();toast('Se restauraron las empresas, pero no se pudieron guardar los datos importados.')});
   };
   rd.readAsText(file);
 }
 document.addEventListener('change',function(ev){
-  if(ev.target.id==='rf'){var f=ev.target.files&&ev.target.files[0];ev.target.value='';if(f)restaurar(f)}
+  var id=ev.target.id,fs=ev.target.files;
+  if(id==='rf'){var f=fs&&fs[0];ev.target.value='';if(f)restaurar(f)}
+  else if(id==='imf'){var l=fs?Array.prototype.slice.call(fs):[];ev.target.value='';if(l.length)importarArchivos(l)}
 });
+
 function boot(){
   var a=getAuth(),ok=false;
   try{ok=sessionStorage.getItem(SKEY)==='1'}catch(e){}
@@ -577,6 +803,8 @@ window.MP={
   empresas:function(){return unlocked?S.empresas:[]},
   activa:function(){return unlocked?activa():null},
   setActiva:setActiva,
+  legacy:function(f){return unlocked?kvGet('legacy:'+f).then(function(r){return r?r.datos:null}):Promise.resolve(null)},
+  vinculos:function(f){return unlocked?kvGet('legacy:'+f).then(function(r){return r?r.vinculos:null}):Promise.resolve(null)},
   onChange:function(f){listeners.push(f)}
 };
 
