@@ -275,7 +275,7 @@ function renderSide(){
     '<div class="menu" id="swMenu" hidden>'+items+(items?'<div class="sep"></div>':'')+'<button type="button" data-act="nueva"><span class="av sm" style="background:var(--acc);color:var(--acc-tx)">+</span><span>Nueva empresa</span></button></div>';
   var cur=route();
   $('#nav').innerHTML=MODS.map(function(m){
-    return '<a href="#'+m.id+'" class="'+(cur===m.id?'on':'')+'">'+svg(m.id)+'<span>'+m.n+'</span>'+(m.d&&m.id!=='ajustes'&&m.id!=='guiones'&&m.id!=='planificador'&&m.id!=='diagnostico'?'<span class="tag">Etapa 2</span>':'')+'</a>';
+    return '<a href="#'+m.id+'" class="'+(cur===m.id?'on':'')+'">'+svg(m.id)+'<span>'+m.n+'</span>'+(m.d&&m.id!=='ajustes'&&m.id!=='guiones'&&m.id!=='planificador'&&m.id!=='diagnostico'&&m.id!=='comparativo'?'<span class="tag">Etapa 2</span>':'')+'</a>';
   }).join('');
 }
 
@@ -290,7 +290,7 @@ function vInicio(){
       '<span class="row-s">Ficha '+p+'%</span>'+(isA?'<span class="badge">Activa</span>':'<button class="btn sm" data-act="usar" data-id="'+e.id+'">Trabajar con esta</button>')+'</div>';
   }).join('');
   var mods=MODS.filter(function(m){return m.d}).map(function(m){
-    return '<div class="row"><div class="row-main"><div class="row-t"><a href="#'+m.id+'" style="color:inherit">'+m.n+'</a></div><div class="row-s">Viene de '+esc(m.o)+'</div></div><span class="badge mut">'+(m.id==='ajustes'?'En proceso':(m.id==='guiones'||m.id==='planificador'||m.id==='diagnostico')?'Listo':'Etapa 2')+'</span></div>';
+    return '<div class="row"><div class="row-main"><div class="row-t"><a href="#'+m.id+'" style="color:inherit">'+m.n+'</a></div><div class="row-s">Viene de '+esc(m.o)+'</div></div><span class="badge mut">'+(m.id==='ajustes'?'En proceso':(m.id==='guiones'||m.id==='planificador'||m.id==='diagnostico'||m.id==='comparativo')?'Listo':'Etapa 2')+'</span></div>';
   }).join('');
   return '<header class="ph"><div><h1>Panel general</h1><p class="sub">Todas tus empresas y herramientas en un solo lugar.</p></div><button class="btn pri" data-act="nueva">Nueva empresa</button></header>'+
     (ultimoResp()?'':'<p class="hint" style="margin:0 0 18px">Aún no has descargado un respaldo. Hazlo en <a href="#ajustes" style="color:var(--acc)">Ajustes</a> para no perder tus datos.</p>')+'<section class="stats"><div class="stat"><b>'+n+'</b><span>Empresas registradas</span></div><div class="stat"><b>'+(a?esc(a.nombre):'-')+'</b><span>Empresa activa</span></div><div class="stat"><b>'+full+' de '+n+'</b><span>Fichas completas</span></div></section>'+
@@ -352,11 +352,12 @@ function vAjustes(){
    '<p class="hint">La clave protege el acceso en este navegador. La sincronización entre equipos llega en la etapa 3.</p>';
 }
 function renderMain(){
-  var r=route(),h=r==='inicio'?vInicio():r==='empresas'?vEmpresas():r==='ajustes'?vAjustes():r==='guiones'?vGuiones():r==='planificador'?vPlan():r==='diagnostico'?vDiag():vModulo(r);
+  var r=route(),h=r==='inicio'?vInicio():r==='empresas'?vEmpresas():r==='ajustes'?vAjustes():r==='guiones'?vGuiones():r==='planificador'?vPlan():r==='diagnostico'?vDiag():r==='comparativo'?vComp():vModulo(r);
   $('#main').innerHTML=h;
   if(r==='guiones')cargarGV();
   if(r==='planificador')cargarPL();
   if(r==='diagnostico')cargarDG();
+  if(r==='comparativo')cargarCP();
   var q=$('#q');
   if(q){q.addEventListener('input',function(){filtro=q.value;var pos=q.selectionStart;renderMain();var n=$('#q');n.focus();n.setSelectionRange(pos,pos)})}
 }
@@ -439,6 +440,8 @@ document.addEventListener('click',function(ev){
   else if(act==='cerrar')$('#dlg').close();
   else if(act==='bloquear')bloquear();
   else if(act==='exportar')exportar();
+  else if(act==='cmes'){movMes(Number(id));renderMain()}
+  else if(act==='cexport')csvComp();
   else if(act==='dedit'){if(DGD&&activa())formDiag()}
   else if(act==='dinforme')verInforme();
   else if(act==='dtnueva'){if(DGD)nuevaTarea()}
@@ -721,6 +724,52 @@ document.addEventListener('submit',function(ev){
   guardarDiag(function(o){var id=o.tareas.reduce(function(m,t){return Math.max(m,Number(t.id)||0)},0)+1;o.tareas.push({id:id,titulo:$('#t1').value.trim(),desc:$('#t2').value.trim(),estado:'todo'})});
   $('#dlg2').close();toast('Tarea agregada');
 });
+/* Módulo Comparativo */
+var CPD=null;
+function vComp(){
+  return '<header class="ph"><div><h1>Comparativo</h1><p class="sub">Resultados de todas tus empresas en '+esc(nombreMes(PL.mes))+'.</p></div><div class="tools" style="margin:0"><button class="btn" data-act="cmes" data-id="-1" aria-label="Mes anterior">&larr;</button><button class="btn" data-act="cmes" data-id="1" aria-label="Mes siguiente">&rarr;</button><button class="btn pri" data-act="cexport">Descargar Excel (CSV)</button></div></header><div id="cpBody"><p class="sub">Cargando...</p></div>';
+}
+function cargarCP(){
+  Promise.all([kvGet('legacy:hmpi'),kvGet('legacy:nadine')]).catch(function(){return [null,null]}).then(function(r){
+    var h=r[0],nd=r[1],filas=[];
+    S.empresas.forEach(function(e){
+      var base={},bm=BM_DEF;
+      if(h){bm=h.datos.BM||BM_DEF;var v=h.vinculos||{};Object.keys(v).forEach(function(k){if(v[k]===e.id)base=h.datos.D[k]||{}})}
+      var o=Object.assign({},base,(S.diag||{})[e.id]||{}),tiene=o.alcance!=null||o.int!=null;
+      var b=bm[o.sector||SECT_TIPO[e.tipo]||'local']||BM_DEF.local;
+      var np=0,vis=0;
+      if(nd){var vn=nd.vinculos||{};(nd.datos.workspaces||[]).forEach(function(w){if(vn[w.id]===e.id)(w.content||[]).forEach(function(x){if((x.date||'').indexOf(PL.mes)===0){np++;vis+=Number(x.views)||0}})})}
+      (S.plan||[]).forEach(function(x){if(x.empresa===e.id&&(x.fecha||'').indexOf(PL.mes)===0)np++});
+      var ok=tiene?(o.int>=b.int)+(o.pub>=b.pub)+(o.resp<=b.resp)+(o.leads>=b.leads):null;
+      filas.push({e:e,tiene:tiene,seg:o.seguidores,alc:o.alcance,int:o.int,pub:o.pub,resp:o.resp,leads:o.leads,np:np,vis:vis,ok:ok});
+    });
+    CPD=filas;pintarCP();
+  });
+}
+function mejorDe(k,menor){
+  var m=null;CPD.forEach(function(f){if(f.tiene&&f[k]!=null&&(!m||(menor?f[k]<m[k]:f[k]>m[k])))m=f});return m;
+}
+function pintarCP(){
+  var b=$('#cpBody');if(!b||!CPD)return;
+  if(!CPD.length){b.innerHTML='<div class="empty"><b>Sin empresas</b>Registra empresas para compararlas.</div>';return}
+  var tarj=[['Más alcance','alc'],['Mejor interacción','int'],['Más seguidores','seg'],['Más contactos','leads']].map(function(t){
+    var m=mejorDe(t[1]);return '<div class="stat"><span>'+t[0]+'</span><b>'+(m?m[t[1]]+(t[1]==='int'?'%':''):'-')+'</b><span>'+(m?esc(m.e.nombre):'Sin datos')+'</span></div>';
+  }).join('');
+  var mx=Math.max.apply(null,CPD.map(function(f){return f.alc||0}).concat([1]));
+  var n=function(v,s2){return v==null?'-':v+(s2||'')};
+  b.innerHTML='<section class="kpi">'+tarj+'</section><h2>Resumen del mes</h2><div class="panel" style="overflow-x:auto"><table class="tbl"><tr><th>Empresa</th><th>Seguidores</th><th>Alcance</th><th>Interacción</th><th>Pub./sem</th><th>Resp. WA (min)</th><th>Contactos</th><th>Publicaciones del mes</th><th>Sobre sector</th></tr>'+
+   CPD.map(function(f){return '<tr><td>'+esc(f.e.nombre)+'</td><td>'+n(f.seg)+'</td><td>'+n(f.alc)+'</td><td>'+n(f.int,'%')+'</td><td>'+n(f.pub)+'</td><td>'+n(f.resp)+'</td><td>'+n(f.leads)+'</td><td>'+f.np+'</td><td>'+(f.ok==null?'-':f.ok+' de 4')+'</td></tr>'}).join('')+'</table></div>'+
+   '<h2>Alcance por empresa</h2><div class="panel">'+CPD.map(function(f){var w=Math.round((f.alc||0)/mx*100);return '<div class="row"><div style="width:170px;flex:none" class="row-t">'+esc(f.e.nombre)+'</div><div class="row-main"><div class="bar" style="max-width:none;height:10px"><i style="width:'+w+'%;background:var(--acc)"></i></div></div><span class="row-s" style="width:60px;text-align:right">'+n(f.alc)+'</span></div>'}).join('')+'</div>';
+}
+function csvComp(){
+  if(!CPD)return;
+  var q=function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'};
+  var rows=[['Empresa','Seguidores','Alcance','Interacción %','Publicaciones por semana','Respuesta WhatsApp (min)','Contactos al mes','Publicaciones del mes','Indicadores sobre el sector']].concat(CPD.map(function(f){return [f.e.nombre,f.seg,f.alc,f.int,f.pub,f.resp,f.leads,f.np,f.ok]}));
+  var blob=new Blob(['\ufeff'+rows.map(function(r){return r.map(q).join(',')}).join('\r\n')],{type:'text/csv;charset=utf-8'});
+  var url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='comparativo-'+PL.mes+'.csv';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url)},1500);toast('CSV descargado');
+}
 /* Clave de acceso única */
 var AKEY='mpconsultoria_auth_v1',SKEY='mpconsultoria_sesion',unlocked=false,fails=0,lockUntil=0;
 function getAuth(){try{return JSON.parse(localStorage.getItem(AKEY))}catch(e){return null}}
