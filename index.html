@@ -214,6 +214,7 @@ var IC={
   guiones:'M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM6 11a6 6 0 0 0 12 0M12 17v4',
   diseno:'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M9 9h.01',
   estadisticas:'M3 3v18h18M7 14l3-3 3 3 5-6',
+  contenido:'M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z',
   comparativo:'M12 4v16M5 20h14M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z',
   ajustes:'M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M6 15v4'
 };
@@ -223,6 +224,7 @@ var MODS=[
   {id:'diagnostico',n:'Diagnóstico y estrategia',d:'Benchmark contra el sector, recomendaciones, estrategias por plataforma e informes para el cliente.',o:'HMPI Pro',u:'las redes, el tipo de negocio y las cifras de la ficha'},
   {id:'planificador',n:'Planificador',d:'Calendario de publicaciones, ideas con IA y estadísticas por mes.',o:'Nadine',u:'el nombre, el logo y las redes de la ficha'},
   {id:'estadisticas',n:'Estadísticas'},
+  {id:'contenido',n:'Ideas y copys'},
   {id:'guiones',n:'Guiones y voz',d:'Reels, videos largos, cuñas de radio y jingles.',o:'CreadorMP',u:'los productos, el público y el tono de la ficha'},
   {id:'diseno',n:'Estudio de diseño',d:'Carruseles, historias y posts con descarga en ZIP.',o:'Estudio de Campañas',u:'el logo, el color, los productos y el tono de la ficha'},
   {id:'comparativo',n:'Comparativo',d:'Una sola tabla con los resultados de todas las empresas.',o:'Nadine y HMPI Pro',u:'todas las empresas registradas'},
@@ -354,13 +356,13 @@ function vAjustes(){
    '<h2>Respaldo</h2><div class="panel">'+
    '<div class="row"><div class="row-main"><div class="row-t">Exportar respaldo</div><div class="row-s">Descarga un archivo con todas tus empresas y logos. '+(u?'Último respaldo: '+esc(fmtFecha(u))+'.':'Aún no has descargado ningún respaldo.')+'</div></div><button class="btn pri" data-act="exportar">Descargar respaldo</button></div>'+
    '<div class="row"><div class="row-main"><div class="row-t">Restaurar respaldo</div><div class="row-s">Reemplaza los datos actuales por los del archivo. La clave de este navegador no cambia.</div></div><label class="btn" for="rf" style="cursor:pointer">Elegir archivo</label><input type="file" id="rf" accept=".json,application/json" hidden></div></div>'+
-   '<h2>Importar datos de las apps anteriores</h2><div class="panel">'+filasFuentes()+
+   gkPanel()+'<h2>Importar datos de las apps anteriores</h2><div class="panel">'+filasFuentes()+
    '<div class="row"><div class="row-main"><div class="row-t">Importar respaldos</div><div class="row-s">Elige los archivos .json de tus apps; puedes seleccionar varios a la vez. Las empresas se unen por nombre y solo se llenan los datos vacíos de cada ficha. El contenido original se conserva completo para los módulos.</div></div><label class="btn pri" for="imf" style="cursor:pointer">Elegir archivos</label><input type="file" id="imf" accept=".json,application/json" multiple hidden></div></div>'+
    informeHtml()+
    '<p class="hint">La clave protege el acceso en este navegador. La sincronización entre equipos llega en la etapa 3.</p>';
 }
 function renderMain(){
-  var r=route(),h=r==='inicio'?vInicio():r==='empresas'?vEmpresas():r==='ajustes'?vAjustes():r==='guiones'?vGuiones():r==='planificador'?vPlan():r==='diagnostico'?vDiag():r==='comparativo'?vComp():r==='diseno'?vDis():r==='estadisticas'?vEst():vModulo(r);
+  var r=route(),h=r==='inicio'?vInicio():r==='empresas'?vEmpresas():r==='ajustes'?vAjustes():r==='guiones'?vGuiones():r==='planificador'?vPlan():r==='diagnostico'?vDiag():r==='comparativo'?vComp():r==='diseno'?vDis():r==='estadisticas'?vEst():r==='contenido'?vIA():vModulo(r);
   $('#main').innerHTML=h;
   if(r==='guiones')cargarGV();
   if(r==='planificador')cargarPL();
@@ -451,6 +453,14 @@ document.addEventListener('click',function(ev){
   else if(act==='cerrar')$('#dlg').close();
   else if(act==='bloquear')bloquear();
   else if(act==='exportar')exportar();
+  else if(act==='gkguardar'){var g0=gk(),nk=$('#gk1').value.trim(),nm=$('#gk2').value.trim()||'gemini-2.5-flash';try{localStorage.setItem(GKEY,JSON.stringify({k:nk||g0.k||'',m:nm}));toast('Conexión guardada');renderMain()}catch(e){toast('No se pudo guardar en este navegador.')}}
+  else if(act==='gkquitar'){try{localStorage.removeItem(GKEY)}catch(e){}toast('Clave eliminada');renderMain()}
+  else if(act==='gkprobar'){var g1=gk();if(!g1.k)return toast('Primero guarda la clave.');toast('Probando...');var pm=IAM.tipo;llamarGemini('Responde solo con la palabra: OK').then(function(){toast('Conexión correcta')},function(e){toast(e.message.slice(0,120))})}
+  else if(act==='iacrear')crearIA();
+  else if(act==='iaprompt'){var ap=activa();if(ap)(navigator.clipboard?navigator.clipboard.writeText(promptIA(ap)):Promise.reject()).then(function(){toast('Prompt copiado. Pégalo en Gemini.')},function(){toast('No se pudo copiar.')})}
+  else if(act==='iaguardar'){var ag=activa();S.ia=S.ia||{};(S.ia[ag.id]=S.ia[ag.id]||[]).unshift({id:uid(),titulo:IAM.tit||'Contenido',red:IAM.red,texto:IAM.res,fecha:Date.now()});save();renderMain();toast('Guardado')}
+  else if(act==='iaver'){var av2=((S.ia||{})[activa().id]||[]).filter(function(x){return x.id===id})[0];if(av2){IAM.res=av2.texto;IAM.tit=av2.titulo;renderMain();window.scrollTo(0,0)}}
+  else if(act==='iaborrar'){var ab=activa();S.ia[ab.id]=(S.ia[ab.id]||[]).filter(function(x){return x.id!==id});save();renderMain()}
   else if(act==='esreg'){if(ESD)formEst()}
   else if(act==='esprint')window.print();
   else if(act==='esel'){DS.i=Number(id);pintarDis()}
@@ -948,6 +958,57 @@ document.addEventListener('submit',function(ev){
   EST.mes=r.month;save();$('#dlg2').close();cargarES();toast('Mes guardado');
 });
 document.addEventListener('change',function(ev){if(ev.target.id==='esMes'){EST.mes=ev.target.value;pintarES()}});
+/* Gemini + Ideas y copys */
+var GKEY='mpconsultoria_gemini';
+function gk(){try{return JSON.parse(localStorage.getItem(GKEY))||{}}catch(e){return {}}}
+function gkPanel(){
+  var g=gk();
+  return '<h2>Conexión con Gemini (IA)</h2><div class="panel"><div class="pw" style="max-width:none;padding:12px 0">'+
+   '<div class="f"><label for="gk1">Clave de API de Google AI Studio</label><input type="password" id="gk1" autocomplete="off" placeholder="'+(g.k?'Clave guardada en este navegador. Escribe otra para cambiarla.':'Pega aquí tu clave')+'"></div>'+
+   '<div class="f"><label for="gk2">Modelo</label><input type="text" id="gk2" value="'+esc(g.m||'gemini-2.5-flash')+'"><small>Si Google cambia el nombre del modelo, cámbialo aquí.</small></div>'+
+   '<div class="acts"><button class="btn pri" data-act="gkguardar">Guardar</button><button class="btn" data-act="gkprobar">Probar conexión</button>'+(g.k?'<button class="btn del" data-act="gkquitar">Quitar clave</button>':'')+'</div>'+
+   '<small>La clave se guarda solo en este navegador y no va en los respaldos. Pégala en cada equipo donde trabajes.</small></div></div>';
+}
+function llamarGemini(prompt){
+  var g=gk();if(!g.k)return Promise.reject(new Error('Falta la clave de Gemini. Pégala en Ajustes.'));
+  return fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(g.m||'gemini-2.5-flash')+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':g.k},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})}).then(function(r){
+    return r.json().catch(function(){return {}}).then(function(j){
+      if(!r.ok)throw new Error((j.error&&j.error.message)||('Error '+r.status));
+      var pt=j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts;
+      if(!pt)throw new Error('Gemini no devolvió texto. Prueba de nuevo.');
+      return pt.map(function(x){return x.text||''}).join('').trim();
+    });
+  },function(){throw new Error('No hay conexión con Gemini. Revisa tu internet.')});
+}
+var IAT=[['idea_reel','Ideas de Reels','Propón 5 ideas de Reels. Para cada una: gancho, desarrollo en 2 líneas y llamado a la acción.'],['idea_carrusel','Ideas de carruseles','Propón 5 ideas de carruseles. Para cada una: título de portada y los títulos de 5 a 7 slides.'],['idea_titulos','Títulos que venden','Escribe 10 títulos llamativos y cortos que vendan.'],
+ ['guion_reel','Guion de Reel / TikTok','Escribe un guion de video de {dur} segundos: gancho, escenas con locución y texto en pantalla, y cierre con llamado a la acción.'],['carrusel','Carrusel','Escribe un carrusel de 6 slides: portada, 4 de contenido y cierre con llamado a la acción. Indica el texto de cada slide.'],['historias','Historias','Escribe una secuencia de 5 historias con texto, sticker sugerido y llamado a la acción.'],
+ ['copy','Copy para publicación','Escribe 3 copys para publicación, con emojis moderados y 5 hashtags.'],['whatsapp','Mensaje de WhatsApp','Escribe 3 mensajes de WhatsApp cortos y cercanos para atender clientes y cerrar ventas.'],['anuncio','Anuncio pagado','Escribe 3 versiones de anuncio: titular (máximo 40 caracteres), texto principal y llamado a la acción.']];
+var IAM={tipo:'guion_reel',red:'Instagram',prod:'',dur:'30',det:'',res:'',err:'',busy:false,tit:''};
+function promptIA(a){
+  var t=IAT.filter(function(x){return x[0]===IAM.tipo})[0];
+  return 'Eres experto en marketing digital para negocios locales de Colombia. Escribe en español colombiano con tono '+(a.tono||'cercano').toLowerCase()+'.\n\nNEGOCIO: '+a.nombre+(a.tipo?' ('+a.tipo+')':'')+(a.ciudad?', en '+a.ciudad:'')+
+   '\nProductos o servicios: '+(IAM.prod||a.productos||'no indicados')+'\nLo que lo hace diferente: '+(a.diferenciales||'no indicado')+'\nPúblico: '+(a.publico||'general')+'\nObjetivo: '+(a.objetivo||'Vender más')+(a.whatsapp?'\nWhatsApp: '+a.whatsapp:'')+
+   '\nRed social: '+IAM.red+'\n\nTAREA: '+t[2].replace('{dur}',IAM.dur)+(IAM.det?'\nDetalle a destacar: '+IAM.det:'')+'\n\nEntrega solo el resultado, listo para usar, sin explicaciones.';
+}
+function vIA(){
+  var a=activa();
+  if(!a)return '<header class="ph"><div><h1>Ideas y copys</h1></div></header><div class="empty"><b>Sin empresa activa</b>Elige o crea una empresa.</div>';
+  var ps=['Toda la marca'].concat(listaTxt(a.productos)),g=gk(),sel=function(id,arr,v){return '<select data-ia="'+id+'">'+arr.map(function(o){var val=Array.isArray(o)?o[0]:o,l=Array.isArray(o)?o[1]:o;return '<option value="'+esc(val)+'"'+(val===v?' selected':'')+'>'+esc(l)+'</option>'}).join('')+'</select>'};
+  var gd=(S.ia||{})[a.id]||[];
+  return '<header class="ph"><div><h1>Ideas y copys</h1><p class="sub">Ideas, guiones y textos de '+esc(a.nombre)+', hechos con su ficha'+(g.k?'':'. Sin clave de Gemini puedes copiar el prompt y pegarlo en Gemini')+'.</p></div></header>'+
+   '<div class="panel" style="padding:14px 16px"><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))"><div class="f"><label>Qué crear</label>'+sel('tipo',IAT.map(function(x){return [x[0],x[1]]}),IAM.tipo)+'</div><div class="f"><label>Red</label>'+sel('red',['Instagram','TikTok','Facebook','YouTube','WhatsApp'],IAM.red)+'</div><div class="f"><label>Producto o servicio</label>'+sel('prod',ps.map(function(x){return [x==='Toda la marca'?'':x,x]}),IAM.prod)+'</div><div class="f"><label>Duración (guiones)</label>'+sel('dur',[['15','15 segundos'],['30','30 segundos'],['60','60 segundos']],IAM.dur)+'</div></div>'+
+   '<div class="f"><label>Detalle (opcional)</label><input type="text" data-ia="det" placeholder="Algo que quieras destacar" value="'+esc(IAM.det)+'"></div><div class="acts" style="margin-top:10px"><button class="btn pri" data-act="iacrear"'+(IAM.busy?' disabled':'')+'>'+(IAM.busy?'Creando...':'Crear con IA')+'</button><button class="btn" data-act="iaprompt">Copiar prompt</button></div></div>'+
+   (IAM.err?'<p class="hint" style="color:var(--bad)">'+esc(IAM.err)+'</p>':'')+
+   (IAM.res?'<h2>Resultado</h2><div class="pre">'+esc(IAM.res)+'</div><p class="acts">'+cp(IAM.res,'Copiar resultado')+'<button class="btn sm pri" data-act="iaguardar">Guardar</button></p>':'')+
+   '<h2>Guardados ('+gd.length+')</h2>'+(gd.length?'<div class="panel">'+gd.map(function(x){return '<div class="row"><div class="row-main"><div class="row-t">'+esc(x.titulo)+'</div><div class="row-s">'+esc(x.red)+' · '+esc(fmtFecha(new Date(x.fecha)))+'</div></div><button class="btn sm" data-act="iaver" data-id="'+x.id+'">Abrir</button><button class="btn sm del" data-act="iaborrar" data-id="'+x.id+'">Eliminar</button></div>'}).join('')+'</div>':'<div class="empty">Lo que guardes aparecerá aquí.</div>');
+}
+document.addEventListener('change',function(ev){var k=ev.target.getAttribute&&ev.target.getAttribute('data-ia');if(k){IAM[k]=ev.target.value}});
+document.addEventListener('input',function(ev){if(ev.target.getAttribute&&ev.target.getAttribute('data-ia')==='det')IAM.det=ev.target.value});
+function crearIA(){
+  var a=activa();if(!a||IAM.busy)return;
+  IAM.busy=true;IAM.err='';renderMain();
+  llamarGemini(promptIA(a)).then(function(t){IAM.res=t;IAM.tit=(IAT.filter(function(x){return x[0]===IAM.tipo})[0][1])+' · '+(IAM.prod||'Toda la marca')},function(e){IAM.err=e.message}).then(function(){IAM.busy=false;if(route()==='contenido')renderMain()});
+}
 /* Clave de acceso única */
 var AKEY='mpconsultoria_auth_v1',SKEY='mpconsultoria_sesion',unlocked=false,fails=0,lockUntil=0;
 function getAuth(){try{return JSON.parse(localStorage.getItem(AKEY))}catch(e){return null}}
@@ -1022,7 +1083,7 @@ function bloquear(){
 }
 function olvide(){
   if(!confirm('Si no recuerdas la clave, se borrarán TODAS las empresas y datos de este navegador y podrás crear una clave nueva. ¿Continuar?'))return;
-  try{localStorage.removeItem(KEY);localStorage.removeItem(AKEY);sessionStorage.removeItem(SKEY)}catch(e){}
+  try{localStorage.removeItem(KEY);localStorage.removeItem(GKEY);localStorage.removeItem(AKEY);sessionStorage.removeItem(SKEY)}catch(e){}
   S={empresas:[],activa:null,imports:{}};
   kvDelPrefix('legacy:').catch(function(){});
   showLock('setup');
