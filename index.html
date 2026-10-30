@@ -1,7 +1,8 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" translate="no">
 <head>
 <meta charset="utf-8">
+<meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MPCONSULTORIA</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -453,7 +454,7 @@ document.addEventListener('click',function(ev){
   else if(act==='cerrar')$('#dlg').close();
   else if(act==='bloquear')bloquear();
   else if(act==='exportar')exportar();
-  else if(act==='gkguardar'){var g0=gk(),nk=$('#gk1').value.trim(),nm=$('#gk2').value.trim()||'gemini-2.5-flash';try{localStorage.setItem(GKEY,JSON.stringify({k:nk||g0.k||'',m:nm}));toast('Conexión guardada');renderMain()}catch(e){toast('No se pudo guardar en este navegador.')}}
+  else if(act==='gkguardar'){var g0=gk(),nk=$('#gk1').value.trim(),nm=$('#gk2').value.trim()||'gemini-3.8-flash';try{localStorage.setItem(GKEY,JSON.stringify({k:nk||g0.k||'',m:nm}));toast('Conexión guardada');renderMain()}catch(e){toast('No se pudo guardar en este navegador.')}}
   else if(act==='gkquitar'){try{localStorage.removeItem(GKEY)}catch(e){}toast('Clave eliminada');renderMain()}
   else if(act==='gkprobar'){var g1=gk();if(!g1.k)return toast('Primero guarda la clave.');toast('Probando...');var pm=IAM.tipo;llamarGemini('Responde solo con la palabra: OK').then(function(){toast('Conexión correcta')},function(e){toast(e.message.slice(0,120))})}
   else if(act==='iacrear')crearIA();
@@ -965,20 +966,38 @@ function gkPanel(){
   var g=gk();
   return '<h2>Conexión con Gemini (IA)</h2><div class="panel"><div class="pw" style="max-width:none;padding:12px 0">'+
    '<div class="f"><label for="gk1">Clave de API de Google AI Studio</label><input type="password" id="gk1" autocomplete="off" placeholder="'+(g.k?'Clave guardada en este navegador. Escribe otra para cambiarla.':'Pega aquí tu clave')+'"></div>'+
-   '<div class="f"><label for="gk2">Modelo</label><input type="text" id="gk2" value="'+esc(g.m||'gemini-2.5-flash')+'"><small>Si Google cambia el nombre del modelo, cámbialo aquí.</small></div>'+
+   '<div class="f"><label for="gk2">Modelo</label><input type="text" id="gk2" value="'+esc(g.m||'gemini-3.8-flash')+'"><small>Si Google cambia el nombre del modelo, cámbialo aquí.</small></div>'+
    '<div class="acts"><button class="btn pri" data-act="gkguardar">Guardar</button><button class="btn" data-act="gkprobar">Probar conexión</button>'+(g.k?'<button class="btn del" data-act="gkquitar">Quitar clave</button>':'')+'</div>'+
    '<small>La clave se guarda solo en este navegador y no va en los respaldos. Pégala en cada equipo donde trabajes.</small></div></div>';
 }
-function llamarGemini(prompt){
+function modeloNuevo(k){
+  return fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200',{headers:{'x-goog-api-key':k}}).then(function(r){return r.json()}).then(function(j){
+    var best=null,bv=0;
+    (j.models||[]).forEach(function(m){var n=String(m.name||''),x=/models\/gemini-(\d+(?:\.\d+)?)-flash$/.exec(n);if(x&&(m.supportedGenerationMethods||[]).indexOf('generateContent')>=0&&parseFloat(x[1])>bv){bv=parseFloat(x[1]);best=n.replace('models/','')}});
+    return best;
+  }).catch(function(){return null});
+}
+function llamarGemini(prompt,reintento){
   var g=gk();if(!g.k)return Promise.reject(new Error('Falta la clave de Gemini. Pégala en Ajustes.'));
-  return fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(g.m||'gemini-2.5-flash')+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':g.k},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})}).then(function(r){
+  return fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(g.m||'gemini-3.8-flash')+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':g.k},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})}).then(function(r){
     return r.json().catch(function(){return {}}).then(function(j){
-      if(!r.ok)throw new Error((j.error&&j.error.message)||('Error '+r.status));
+      if(!r.ok){
+        var msg=(j.error&&j.error.message)||('Error '+r.status);
+        if(!reintento&&/no longer available|not found|no longer supported|not supported/i.test(msg)){
+          return modeloNuevo(g.k).then(function(m){
+            if(!m||m===g.m)throw new Error(msg);
+            try{localStorage.setItem(GKEY,JSON.stringify({k:g.k,m:m}))}catch(e){}
+            toast('Modelo actualizado a '+m);
+            return llamarGemini(prompt,true);
+          });
+        }
+        throw new Error(msg);
+      }
       var pt=j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts;
       if(!pt)throw new Error('Gemini no devolvió texto. Prueba de nuevo.');
       return pt.map(function(x){return x.text||''}).join('').trim();
     });
-  },function(){throw new Error('No hay conexión con Gemini. Revisa tu internet.')});
+  },function(e){if(e&&e.message&&e.name!=='TypeError')throw e;throw new Error('No hay conexión con Gemini. Revisa tu internet.')});
 }
 var IAT=[['idea_reel','Ideas de Reels','Propón 5 ideas de Reels. Para cada una: gancho, desarrollo en 2 líneas y llamado a la acción.'],['idea_carrusel','Ideas de carruseles','Propón 5 ideas de carruseles. Para cada una: título de portada y los títulos de 5 a 7 slides.'],['idea_titulos','Títulos que venden','Escribe 10 títulos llamativos y cortos que vendan.'],
  ['guion_reel','Guion de Reel / TikTok','Escribe un guion de video de {dur} segundos: gancho, escenas con locución y texto en pantalla, y cierre con llamado a la acción.'],['carrusel','Carrusel','Escribe un carrusel de 6 slides: portada, 4 de contenido y cierre con llamado a la acción. Indica el texto de cada slide.'],['historias','Historias','Escribe una secuencia de 5 historias con texto, sticker sugerido y llamado a la acción.'],
