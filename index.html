@@ -173,8 +173,8 @@ input[type=color]{width:56px;height:38px;padding:2px;background:var(--bg);border
 <div class="app">
   <aside class="side" id="side">
     <div class="brand">
-      <div class="brand-mark">MP</div>
-      <div><div class="brand-name">MPCONSULTORIA</div><div class="brand-sub">Todo en un solo lugar</div></div>
+      <div class="brand-mark" id="bMark">MP</div>
+      <div><div class="brand-name" id="bName">MPCONSULTORIA</div><div class="brand-sub">Todo en un solo lugar</div></div>
     </div>
     <div class="switch" id="switch"></div>
     <nav class="nav" id="nav"></nav>
@@ -359,7 +359,7 @@ function vAjustes(){
    '<h2>Respaldo</h2><div class="panel">'+
    '<div class="row"><div class="row-main"><div class="row-t">Exportar respaldo</div><div class="row-s">Descarga un archivo con todas tus empresas y logos. '+(u?'Último respaldo: '+esc(fmtFecha(u))+'.':'Aún no has descargado ningún respaldo.')+'</div></div><button class="btn pri" data-act="exportar">Descargar respaldo</button></div>'+
    '<div class="row"><div class="row-main"><div class="row-t">Restaurar respaldo</div><div class="row-s">Reemplaza los datos actuales por los del archivo. La clave de este navegador no cambia.</div></div><label class="btn" for="rf" style="cursor:pointer">Elegir archivo</label><input type="file" id="rf" accept=".json,application/json" hidden></div></div>'+
-   gkPanel()+'<h2>Importar datos de las apps anteriores</h2><div class="panel">'+filasFuentes()+
+   marcaPanel()+gkPanel()+'<h2>Importar datos de las apps anteriores</h2><div class="panel">'+filasFuentes()+
    '<div class="row"><div class="row-main"><div class="row-t">Importar respaldos</div><div class="row-s">Elige los archivos .json de tus apps; puedes seleccionar varios a la vez. Las empresas se unen por nombre y solo se llenan los datos vacíos de cada ficha. El contenido original se conserva completo para los módulos.</div></div><label class="btn pri" for="imf" style="cursor:pointer">Elegir archivos</label><input type="file" id="imf" accept=".json,application/json" multiple hidden></div></div>'+
    informeHtml()+
    '<p class="hint">La clave protege el acceso en este navegador. La sincronización entre equipos llega en la etapa 3.</p>';
@@ -376,7 +376,7 @@ function renderMain(){
   var q=$('#q');
   if(q){q.addEventListener('input',function(){filtro=q.value;var pos=q.selectionStart;renderMain();var n=$('#q');n.focus();n.setSelectionRange(pos,pos)})}
 }
-function renderAll(){if(!unlocked)return;renderSide();renderMain()}
+function renderAll(){if(!unlocked)return;aplicarMarca();renderSide();renderMain()}
 
 /* Formulario de empresa */
 var editId=null,logoTmp='';
@@ -456,6 +456,17 @@ document.addEventListener('click',function(ev){
   else if(act==='cerrar')$('#dlg').close();
   else if(act==='bloquear')bloquear();
   else if(act==='exportar')exportar();
+  else if(act==='apguardar'){S.app=S.app||{};S.app.nombre=$('#ap1').value.trim()||'MPCONSULTORIA';save();renderAll();toast('Nombre guardado')}
+  else if(act==='aplogoquitar'){S.app=S.app||{};delete S.app.logo;save();renderAll()}
+  else if(act==='npgen')generarNP();
+  else if(act==='npprompt'){var an=activa();(navigator.clipboard?navigator.clipboard.writeText(promptNP(an)):Promise.reject()).then(function(){toast('Prompt copiado. Pégalo en Gemini y trae el resultado.')},function(){toast('No se pudo copiar.')})}
+  else if(act==='npborr'){NP.res=borradorNP(activa());NP.err='';pintarGV()}
+  else if(act==='npguardar'){var ag2=activa();S.proyectos=S.proyectos||{};(S.proyectos[ag2.id]=S.proyectos[ag2.id]||[]).unshift({id:uid(),propio:true,titulo:NP.res.titulo||'Proyecto',tipo:NP.tipo,duracion:Number(NP.dur),estado:'guion',resultado:NP.res});NP.res=null;save();GV.tab='prod';toast('Proyecto guardado en Guion');cargarGV()}
+  else if(act==='npborrar'){var ab2=activa();S.proyectos[ab2.id]=(S.proyectos[ab2.id]||[]).filter(function(x){return x.id!==id});save();$('#dlg2').close();cargarGV()}
+  else if(act==='vzgen')generarVoz();
+  else if(act==='vzver'){var h2=$('#au-'+id);if(h2)kvGet('voz:'+id).then(function(u){h2.innerHTML=u?'<audio controls autoplay src="'+u+'"></audio>':'<span class="row-s">No se encontró el audio en este navegador.</span>'})}
+  else if(act==='vzbajar'){kvGet('voz:'+id).then(function(u){if(!u)return toast('No se encontró el audio.');var a3=document.createElement('a');a3.href=u;a3.download='voz-'+id+'.wav';document.body.appendChild(a3);a3.click();a3.remove()})}
+  else if(act==='vzborrar'){if(confirm('¿Eliminar esta toma?')){var ac=activa();S.voces[ac.id]=S.voces[ac.id].filter(function(x){return x.id!==id});save();db().then(function(d){d.transaction('kv','readwrite').objectStore('kv').delete('voz:'+id)}).catch(function(){});pintarGV()}}
   else if(act==='dgtab'){DG.tab=id;DG.ia='';DG.err='';renderMain()}
   else if(act==='simnueva')formSim();
   else if(act==='simedit'){var sx=((S.sim||{})[activa().id]||[]).filter(function(x){return x.id===id})[0];if(sx)formSim(sx)}
@@ -541,7 +552,7 @@ var ESTADOS=[['idea','Idea'],['guion','Guion'],['produccion','Producción'],['li
 function vGuiones(){
   var a=activa();
   return '<header class="ph"><div><h1>Guiones y voz</h1><p class="sub">'+(a?'Proyectos y guiones de '+esc(a.nombre)+'.':'Elige una empresa para ver sus guiones.')+'</p></div><button class="btn pri" data-act="gnuevo">Nuevo guion</button></header>'+
-   '<div class="tabs"><button data-act="gtab" data-id="prod" class="'+(GV.tab==='prod'?'on':'')+'">Producción</button><button data-act="gtab" data-id="guiones" class="'+(GV.tab==='guiones'?'on':'')+'">Guiones</button></div><div id="gvBody"><p class="sub">Cargando...</p></div>';
+   '<div class="tabs" style="flex-wrap:wrap">'+[['prod','Producción'],['nuevo','Nuevo proyecto'],['voz','Voz'],['guiones','Guiones']].map(function(t){return '<button data-act="gtab" data-id="'+t[0]+'" class="'+(GV.tab===t[0]?'on':'')+'">'+t[1]+'</button>'}).join('')+'</div><div id="gvBody"><p class="sub">Cargando...</p></div>';
 }
 function cargarGV(){
   var a=activa();if(!a)return;
@@ -556,6 +567,7 @@ function cargarGV(){
       var vn=nd.vinculos||{};
       (nd.datos.workspaces||[]).forEach(function(w){if(vn[w.id]===a.id)(w.scripts||[]).forEach(function(x){D.scripts.push({id:x.id,titulo:x.title,plataforma:x.platform,gancho:x.hook,cuerpo:x.body,cta:x.cta,texto:x.caption,origen:'Nadine'})})});
     }
+    ((S.proyectos||{})[a.id]||[]).forEach(function(x){D.proj.push(x)});
     (S.guiones||[]).filter(function(g){return g.empresa===a.id}).forEach(function(g){D.scripts.unshift(g)});
     GVD=D;pintarGV();
   });
@@ -563,6 +575,8 @@ function cargarGV(){
 function estadoDe(p){var e=(S.estados||{})[p.id]||p.estado;return ESTADOS.some(function(x){return x[0]===e})?e:'idea'}
 function pintarGV(){
   var b=$('#gvBody');if(!b||!GVD)return;
+  if(GV.tab==='nuevo'){pintarNP(b);return}
+  if(GV.tab==='voz'){pintarVoz(b);return}
   if(GV.tab==='prod'){
     if(!GVD.proj.length){b.innerHTML='<div class="empty"><b>Sin proyectos</b>Esta empresa no tiene proyectos de producción importados.</div>';return}
     b.innerHTML='<div class="kan">'+ESTADOS.map(function(es,i){
@@ -595,6 +609,7 @@ function verProyecto(id){
   h+=bloque('Título para publicar',k.titulo)+bloque('Descripción',k.descripcion)+bloque('Hashtags',(k.hashtags||[]).join(' '))+bloque('Comentario fijado',k.comentario_fijado);
   var au=GVD.media[p.id]||[];
   if(au.length){h+='<h3>Voces generadas</h3>'+au.map(function(m){return '<div class="row-s">'+esc(m.voice||'')+(m.fecha?' · '+esc(fmtFecha(new Date(m.fecha))):'')+'</div><audio controls preload="none" src="'+esc(m.data)+'"></audio>'}).join('')}
+  if(p.propio)h+='<p><button class="btn sm del" data-act="npborrar" data-id="'+esc(p.id)+'">Eliminar proyecto</button></p>';
   abrirD2(p.titulo,h||'<p class="sub">Este proyecto aún no tiene guion generado.</p>');
 }
 function verGuion(i){
@@ -1188,6 +1203,117 @@ document.addEventListener('submit',function(ev){
   if(e)Object.assign(e,o);else{o.id=uid();l.push(o)}
   save();$('#dlg2').close();renderMain();toast('Flujo guardado');
 });
+/* Ronda 4: marca, Nuevo proyecto (Veo) y Voz */
+function aplicarMarca(){
+  var ap=S.app||{},m=$('#bMark'),n=$('#bName');if(!m||!n)return;
+  n.textContent=ap.nombre||'MPCONSULTORIA';document.title=ap.nombre||'MPCONSULTORIA';
+  if(ap.logo){m.innerHTML='<img src="'+ap.logo+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px">';m.style.background='transparent'}
+  else{m.textContent=(ap.nombre||'MP').trim().slice(0,2).toUpperCase();m.style.background=''}
+}
+function marcaPanel(){
+  var ap=S.app||{};
+  return '<h2>Tu estudio</h2><div class="panel"><div class="pw" style="max-width:none;padding:12px 0"><div class="f"><label for="ap1">Nombre de la aplicación</label><input type="text" id="ap1" value="'+esc(ap.nombre||'MPCONSULTORIA')+'"></div>'+
+   '<div class="f"><label>Logo</label><div class="logo-row"><span class="av lg">'+(ap.logo?'<img src="'+ap.logo+'" alt="">':'MP')+'</span><div><label class="btn sm" for="apLogo" style="cursor:pointer">Cambiar logo</label><input type="file" id="apLogo" accept="image/*" hidden> <button class="btn sm" data-act="aplogoquitar">Quitar</button><br><small>Mejor una imagen cuadrada. Se ve en el menú y en la pestaña del navegador.</small></div></div></div>'+
+   '<div><button class="btn pri" data-act="apguardar">Guardar nombre</button></div></div></div>';
+}
+document.addEventListener('change',function(ev){
+  if(ev.target.id!=='apLogo')return;
+  var f=ev.target.files&&ev.target.files[0];ev.target.value='';if(!f)return;
+  var rd=new FileReader();rd.onload=function(){reducirLogo(rd.result).then(function(lg){if(!lg)return toast('No se pudo leer esa imagen.');S.app=S.app||{};S.app.logo=lg;save();renderAll();toast('Logo actualizado')})};rd.readAsDataURL(f);
+});
+
+/* Nuevo proyecto */
+var NP={tipo:'Reel / TikTok / Short',dur:'30',clip:'8',fmt:'9:16 vertical',idioma:'español',audio:'Voz en off aparte (solo ambiente en los clips)',atm:'Auto (según el nicho)',tema:'',res:null,err:'',busy:false};
+var NP_OPT={tipo:['Reel / TikTok / Short','Video largo (YouTube)','Cuña comercial / radio','Jingle'],dur:['15','30','60','180'],clip:['4','6','8'],fmt:['9:16 vertical','16:9 horizontal','1:1 cuadrado'],audio:['Voz en off aparte (solo ambiente en los clips)','Personajes que hablan dentro del clip'],atm:['Auto (según el nicho)','Cálida y acogedora','Moderna y limpia','Divertida y colorida','Elegante y premium']};
+function pintarNP(b){
+  var a=activa(),sel=function(k){return '<div class="f"><label>'+({tipo:'Tipo de pieza',dur:'Duración (segundos)',clip:'Clip de Veo (segundos)',fmt:'Formato',audio:'Audio dentro de los clips',atm:'Atmósfera y dirección'})[k]+'</label><select data-np="'+k+'">'+NP_OPT[k].map(function(o){return '<option'+(o===NP[k]?' selected':'')+'>'+esc(o)+'</option>'}).join('')+'</select></div>'},r=NP.res;
+  b.innerHTML='<div class="panel" style="padding:14px 16px"><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr))">'+['tipo','dur','clip','fmt','audio','atm'].map(sel).join('')+'<div class="f"><label>Idioma</label><input type="text" data-np="idioma" value="'+esc(NP.idioma)+'"></div></div>'+
+   '<div class="f"><label>Tema o idea (opcional)</label><input type="text" data-np="tema" placeholder="Ej: el desayuno de domingo en familia" value="'+esc(NP.tema)+'"></div><div class="acts" style="margin-top:10px"><button class="btn pri" data-act="npgen"'+(NP.busy?' disabled':'')+'>'+(NP.busy?'Generando...':'Generar con Gemini')+'</button><button class="btn" data-act="npprompt">Copiar prompt</button><button class="btn" data-act="npborr">Borrador sin IA</button></div></div>'+
+   (NP.err?'<p class="hint" style="color:var(--bad)">'+esc(NP.err)+'</p>':'')+
+   (r?'<h2>'+esc(r.titulo||'Proyecto')+'</h2><div class="panel" style="padding:12px 16px"><div class="row-s">Gancho: '+esc(r.gancho||'')+'</div><div class="row-s" style="margin-top:6px">'+(r.escenas||[]).length+' escenas · '+esc(a.nombre)+'</div></div><div class="acts"><button class="btn pri" data-act="npguardar">Guardar proyecto</button></div>':'<p class="hint">Gemini escribe el guion por escenas con los prompts para Veo 3, la dirección de voz y el kit para redes. Sin clave, usa "Copiar prompt" o el borrador.</p>');
+}
+document.addEventListener('change',function(ev){var k=ev.target.getAttribute&&ev.target.getAttribute('data-np');if(k)NP[k]=ev.target.value});
+document.addEventListener('input',function(ev){var k=ev.target.getAttribute&&ev.target.getAttribute('data-np');if(k)NP[k]=ev.target.value});
+function promptNP(a){
+  var ns=Math.max(1,Math.round(Number(NP.dur)/Number(NP.clip)));
+  return 'Eres director creativo de video para negocios locales de Colombia. Crea un guion para una pieza de tipo "'+NP.tipo+'" de '+NP.dur+' segundos, formato '+NP.fmt+', idioma '+NP.idioma+'. Atmósfera: '+NP.atm+'. Audio: '+NP.audio+'.\n\nNEGOCIO: '+a.nombre+' ('+a.tipo+(a.ciudad?', '+a.ciudad:'')+'). Productos: '+(a.productos||'no indicados')+'. Diferenciales: '+(a.diferenciales||'no indicados')+'. Público: '+(a.publico||'general')+'. Tono: '+(a.tono||'Cercano')+'. Objetivo: '+(a.objetivo||'Vender más')+(a.whatsapp?'. WhatsApp: '+a.whatsapp:'')+'.'+(NP.tema?'\nTEMA: '+NP.tema:'')+
+   '\n\nDivide en '+ns+' escenas de '+NP.clip+' segundos cada una. Los prompt_veo van en inglés, describen cámara, luz, acción y ambiente, y mantienen el mismo personaje y lugar descritos en ancla_visual.\nResponde SOLO con JSON válido, sin texto extra ni comillas de código, con esta forma:\n{"titulo":"","gancho":"","ancla_visual":"","escenas":[{"n":1,"duracion":'+NP.clip+',"locucion":"","texto_pantalla":"","visual":"","prompt_veo":""}],"cta":"","kit":{"titulo":"","descripcion":"","hashtags":["#"],"comentario_fijado":""}}';
+}
+function leerJSONtexto(t){
+  t=String(t||'').replace(/```json|```/g,'');var i=t.indexOf('{'),j=t.lastIndexOf('}');
+  if(i<0||j<i)throw new Error('Gemini no devolvió un guion en el formato esperado. Intenta de nuevo.');
+  var o=JSON.parse(t.slice(i,j+1));if(!o.escenas||!o.escenas.length)throw new Error('El guion llegó sin escenas. Intenta de nuevo.');return o;
+}
+function generarNP(){
+  var a=activa();if(!a||NP.busy)return;NP.busy=true;NP.err='';pintarGV();
+  llamarGemini(promptNP(a)).then(function(t){NP.res=leerJSONtexto(t)},function(e){NP.err=e.message}).then(function(){NP.busy=false;if(route()==='guiones')pintarGV()});
+}
+function borradorNP(a){
+  var ns=Math.max(1,Math.round(Number(NP.dur)/Number(NP.clip))),pr=listaTxt(a.productos),df=listaTxt(a.diferenciales),es=[];
+  for(var i=1;i<=ns;i++){
+    var tx=i===1?'¿Conoces '+a.nombre+'?':i===ns?'Escríbenos'+(a.whatsapp?' al '+a.whatsapp:' hoy')+'.':(pr[i-2]||df[i-2]||'Lo que nos hace diferentes');
+    es.push({n:i,duracion:Number(NP.clip),locucion:tx,texto_pantalla:tx,visual:'Plano del negocio y del producto',prompt_veo:NP.fmt.split(' ')[0]+' video, '+NP.atm+', '+(a.tipo||'local business')+' in '+(a.ciudad||'Colombia')+', showing '+(pr[i-2]||'the product')+', natural light, smooth camera movement.'});
+  }
+  return {titulo:(NP.tema||'Video de '+a.nombre),gancho:es[0].locucion,ancla_visual:a.nombre+', '+(a.tipo||'')+', '+(a.ciudad||''),escenas:es,cta:'Escríbenos'+(a.whatsapp?' al '+a.whatsapp:''),kit:{titulo:NP.tema||a.nombre,descripcion:'',hashtags:[],comentario_fijado:''}};
+}
+
+/* Voz */
+var VZ={proy:'',voz:'Aoede',estilo:'Warm, friendly, smiling delivery with inviting and enthusiastic tone',texto:'',busy:false,err:''};
+var VOCES=['Aoede','Kore','Charon','Puck','Fenrir','Leda','Orus','Zephyr','Achird','Sulafat'];
+function pintarVoz(b){
+  var a=activa(),ps=GVD.proj.filter(function(p){return p.resultado&&p.resultado.escenas}),mi=(S.voces||{})[a.id]||[];
+  b.innerHTML='<div class="panel" style="padding:14px 16px"><div class="f"><label>Proyecto</label><select data-vz="proy"><option value="">Texto libre</option>'+ps.map(function(p){return '<option value="'+esc(p.id)+'"'+(p.id===VZ.proy?' selected':'')+'>'+esc(p.titulo)+'</option>'}).join('')+'</select></div>'+
+   '<div class="f"><label>Texto a locutar</label><textarea data-vz="texto" style="min-height:130px">'+esc(VZ.texto)+'</textarea><small>'+(VZ.texto.trim()?VZ.texto.trim().split(/\s+/).length:0)+' palabras · ~'+Math.round((VZ.texto.trim()?VZ.texto.trim().split(/\s+/).length:0)/2.5)+' s</small></div>'+
+   '<div class="grid" style="grid-template-columns:200px 1fr"><div class="f"><label>Voz</label><select data-vz="voz">'+VOCES.map(function(v){return '<option'+(v===VZ.voz?' selected':'')+'>'+v+'</option>'}).join('')+'</select></div><div class="f"><label>Estilo de lectura</label><input type="text" data-vz="estilo" value="'+esc(VZ.estilo)+'"></div></div>'+
+   '<div class="acts"><button class="btn pri" data-act="vzgen"'+(VZ.busy?' disabled':'')+'>'+(VZ.busy?'Generando voz...':'Generar voz')+'</button></div></div>'+
+   (VZ.err?'<p class="hint" style="color:var(--bad)">'+esc(VZ.err)+'</p>':'')+
+   '<h2>Tomas guardadas ('+mi.length+')</h2>'+(mi.length?'<div class="panel">'+mi.map(function(m){return '<div class="row" style="flex-wrap:wrap"><div class="row-main"><div class="row-t">'+esc(m.voz)+' <span class="row-s">· '+esc(m.proy||'Texto libre')+' · '+esc(fmtFecha(new Date(m.fecha)))+'</span></div><div class="row-s">'+esc(m.estilo)+'</div></div><button class="btn sm" data-act="vzver" data-id="'+m.id+'">Escuchar</button><button class="btn sm" data-act="vzbajar" data-id="'+m.id+'">Descargar</button><button class="btn sm del" data-act="vzborrar" data-id="'+m.id+'">Eliminar</button><div id="au-'+m.id+'" style="width:100%"></div></div>'}).join('')+'</div>':'<div class="empty">Las voces que generes aparecerán aquí.</div>');
+}
+document.addEventListener('change',function(ev){
+  var k=ev.target.getAttribute&&ev.target.getAttribute('data-vz');if(!k)return;
+  VZ[k]=ev.target.value;
+  if(k==='proy'){var p=GVD&&GVD.proj.filter(function(x){return x.id===VZ.proy})[0];VZ.texto=p?(p.resultado.escenas||[]).map(function(e){return e.locucion}).filter(Boolean).join('\n'):'';pintarGV()}
+});
+document.addEventListener('input',function(ev){var k=ev.target.getAttribute&&ev.target.getAttribute('data-vz');if(k&&k!=='proy')VZ[k]=ev.target.value});
+function pcmAWav(b64,rate){
+  var bin=atob(b64),n=bin.length,u=new Uint8Array(n),i;for(i=0;i<n;i++)u[i]=bin.charCodeAt(i);
+  var h=new DataView(new ArrayBuffer(44)),w=function(o,t){for(var k=0;k<t.length;k++)h.setUint8(o+k,t.charCodeAt(k))};
+  w(0,'RIFF');h.setUint32(4,36+n,true);w(8,'WAVE');w(12,'fmt ');h.setUint32(16,16,true);h.setUint16(20,1,true);h.setUint16(22,1,true);h.setUint32(24,rate,true);h.setUint32(28,rate*2,true);h.setUint16(32,2,true);h.setUint16(34,16,true);w(36,'data');h.setUint32(40,n,true);
+  return new Blob([h.buffer,u],{type:'audio/wav'});
+}
+function blobAUrl(bl){return new Promise(function(res){var r=new FileReader();r.onload=function(){res(r.result)};r.readAsDataURL(bl)})}
+function modeloTTS(k){
+  return fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200',{headers:{'x-goog-api-key':k}}).then(function(r){return r.json()}).then(function(j){
+    var c=(j.models||[]).filter(function(m){return /tts/i.test(m.name)&&(m.supportedGenerationMethods||[]).indexOf('generateContent')>=0}).map(function(m){return m.name.replace('models/','')});
+    c.sort(function(a,b){return (/pro/i.test(a)?1:0)-(/pro/i.test(b)?1:0)});return c[0]||null;
+  }).catch(function(){return null});
+}
+function pedirVoz(modelo,g){
+  return fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(modelo)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':g.k},body:JSON.stringify({contents:[{parts:[{text:(VZ.estilo?VZ.estilo+': ':'')+VZ.texto}]}],generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:VZ.voz}}}}})}).then(function(r){
+    return r.json().catch(function(){return {}}).then(function(j){
+      if(!r.ok)throw new Error((j.error&&j.error.message)||('Error '+r.status));
+      var pt=j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts,d=pt&&pt.filter(function(x){return x.inlineData})[0];
+      if(!d)throw new Error('Gemini no devolvió audio. Prueba de nuevo.');
+      var m=/rate=(\d+)/.exec(d.inlineData.mimeType||'');return pcmAWav(d.inlineData.data,m?Number(m[1]):24000);
+    });
+  });
+}
+function generarVoz(){
+  var a=activa(),g=gk();if(!a||VZ.busy)return;
+  if(!g.k){VZ.err='Falta la clave de Gemini. Pégala en Ajustes.';return pintarGV()}
+  if(!VZ.texto.trim()){VZ.err='Escribe o elige el texto a locutar.';return pintarGV()}
+  VZ.busy=true;VZ.err='';pintarGV();
+  var uso=g.t||'gemini-2.5-flash-preview-tts';
+  pedirVoz(uso,g).catch(function(e){
+    if(!/no longer|not found|not supported|invalid/i.test(e.message))throw e;
+    return modeloTTS(g.k).then(function(m){if(!m||m===uso)throw e;g.t=m;try{localStorage.setItem(GKEY,JSON.stringify(g))}catch(x){}return pedirVoz(m,g)});
+  }).then(function(bl){
+    return blobAUrl(bl).then(function(url){
+      var id=uid(),p=GVD.proj.filter(function(x){return x.id===VZ.proy})[0];
+      return kvSet('voz:'+id,url).then(function(){S.voces=S.voces||{};(S.voces[a.id]=S.voces[a.id]||[]).unshift({id:id,proy:p?p.titulo:'',voz:VZ.voz,estilo:VZ.estilo,fecha:Date.now()});save();toast('Voz guardada')});
+    });
+  }).catch(function(e){VZ.err=e.message}).then(function(){VZ.busy=false;if(route()==='guiones')pintarGV()});
+}
 /* Clave de acceso única */
 var AKEY='mpconsultoria_auth_v1',SKEY='mpconsultoria_sesion',unlocked=false,fails=0,lockUntil=0;
 function getAuth(){try{return JSON.parse(localStorage.getItem(AKEY))}catch(e){return null}}
@@ -1486,9 +1612,10 @@ function fmtFecha(d){return d.toLocaleDateString('es-CO',{day:'numeric',month:'l
 function exportar(){
   var now=new Date(),falloIdb=false;
   kvAll().catch(function(){falloIdb=true;return {}}).then(function(all){
-    var legacy={};
-    Object.keys(all).forEach(function(k){if(k.indexOf('legacy:')===0)legacy[k.slice(7)]=all[k]});
-    var data={app:'MPCONSULTORIA',version:2,fecha:now.toISOString(),datos:{empresas:S.empresas,activa:S.activa,imports:S.imports||{},legacy:legacy}};
+    var legacy={},voces={},extra={};
+    Object.keys(all).forEach(function(k){if(k.indexOf('legacy:')===0)legacy[k.slice(7)]=all[k];else if(k.indexOf('voz:')===0)voces[k.slice(4)]=all[k]});
+    Object.keys(S).forEach(function(k){if(['empresas','activa','imports','informe'].indexOf(k)<0)extra[k]=S[k]});
+    var data={app:'MPCONSULTORIA',version:2,fecha:now.toISOString(),datos:{empresas:S.empresas,activa:S.activa,imports:S.imports||{},legacy:legacy,voces:voces,extra:extra}};
     var blob=new Blob([JSON.stringify(data)],{type:'application/json'});
     var url=URL.createObjectURL(blob),a=document.createElement('a');
     a.href=url;a.download='mpconsultoria-respaldo-'+now.toISOString().slice(0,10)+'.json';
@@ -1521,15 +1648,17 @@ function restaurar(file){
       while(seen[e.id])e.id=uid();
       seen[e.id]=1;em.push(e);
     });
-    var lg=d.datos.legacy&&typeof d.datos.legacy==='object'?d.datos.legacy:null;
+    var lg=d.datos.legacy&&typeof d.datos.legacy==='object'?d.datos.legacy:null,vc=d.datos.voces&&typeof d.datos.voces==='object'?d.datos.voces:null,ex=d.datos.extra&&typeof d.datos.extra==='object'?d.datos.extra:null;
     var f=d.fecha?new Date(d.fecha):null,ft=f&&!isNaN(f)?' del '+fmtFecha(f):'';
     if(!confirm('Se reemplazarán las '+S.empresas.length+' empresas actuales por las '+em.length+' del respaldo'+ft+(lg?', junto con los datos importados de las apps anteriores':'')+'. ¿Continuar?'))return;
     S.empresas=em;
     S.activa=seen[d.datos.activa]?d.datos.activa:(em.length?em[0].id:null);
     var p=Promise.resolve();
+    if(ex){Object.keys(S).forEach(function(k){if(['empresas','activa','imports','informe'].indexOf(k)<0)delete S[k]});Object.keys(ex).forEach(function(k){S[k]=ex[k]})}
+    if(vc)p=p.then(function(){return kvDelPrefix('voz:')}).then(function(){return Promise.all(Object.keys(vc).map(function(k){return kvSet('voz:'+k,vc[k])}))});
     if(lg){
       S.imports=d.datos.imports&&typeof d.datos.imports==='object'?d.datos.imports:{};
-      p=kvDelPrefix('legacy:').then(function(){return Promise.all(Object.keys(lg).map(function(k){return kvSet('legacy:'+k,lg[k])}))});
+      p=p.then(function(){return kvDelPrefix('legacy:')}).then(function(){return Promise.all(Object.keys(lg).map(function(k){return kvSet('legacy:'+k,lg[k])}))});
     }
     p.then(function(){save();renderAll();toast('Respaldo restaurado: '+em.length+' empresas')},
            function(){save();renderAll();toast('Se restauraron las empresas, pero no se pudieron guardar los datos importados.')});
