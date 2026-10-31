@@ -495,7 +495,7 @@ document.addEventListener('click',function(ev){
   else if(act==='iaborrar'){var ab=activa();S.ia[ab.id]=(S.ia[ab.id]||[]).filter(function(x){return x.id!==id});save();renderMain()}
   else if(act==='esreg'){if(ESD)formEst()}
   else if(act==='esprint')window.print();
-  else if(act==='enlimpiar'){EN.clips=[];pintarGV()}
+  else if(act==='enlimpiar'){EN.clips=[];EN.dimAuto=null;pintarGV()}
   else if(act==='enprev')ensRun(false);
   else if(act==='enexp')ensRun(true);
   else if(act==='enstop'){if(ENR)ENR.stop=true}
@@ -1297,13 +1297,14 @@ function borradorNP(a){
 }
 
 /* Voz */
-var VZ={proy:'',voz:'Aoede',estilo:'Warm, friendly, smiling delivery with inviting and enthusiastic tone',texto:'',busy:false,err:''};
+var ACENTOS={'Colombiano paisa (Antioquia)':'Colombian Paisa (Antioquia)','Colombiano bogotano':'Colombian Bogotá Andean','Colombiano costeño':'Colombian Caribbean coast','Colombiano caleño':'Colombian Cali (Valle del Cauca)','Latino neutro':'neutral Latin American'};
+var VZ={proy:'',voz:'Aoede',acento:'Colombiano paisa (Antioquia)',estilo:'Warm, friendly, smiling delivery with inviting and enthusiastic tone',texto:'',busy:false,err:''};
 var VOCES=['Aoede','Kore','Charon','Puck','Fenrir','Leda','Orus','Zephyr','Achird','Sulafat'];
 function pintarVoz(b){
   var a=activa(),ps=GVD.proj.filter(function(p){return p.resultado&&p.resultado.escenas}),mi=(S.voces||{})[a.id]||[];
   b.innerHTML='<div class="panel" style="padding:14px 16px"><div class="f"><label>Proyecto</label><select data-vz="proy"><option value="">Texto libre</option>'+ps.map(function(p){return '<option value="'+esc(p.id)+'"'+(p.id===VZ.proy?' selected':'')+'>'+esc(p.titulo)+'</option>'}).join('')+'</select></div>'+
    '<div class="f"><label>Texto a locutar</label><textarea data-vz="texto" style="min-height:130px">'+esc(VZ.texto)+'</textarea><small>'+(VZ.texto.trim()?VZ.texto.trim().split(/\s+/).length:0)+' palabras · ~'+Math.round((VZ.texto.trim()?VZ.texto.trim().split(/\s+/).length:0)/2.5)+' s</small></div>'+
-   '<div class="grid" style="grid-template-columns:200px 1fr"><div class="f"><label>Voz</label><select data-vz="voz">'+VOCES.map(function(v){return '<option'+(v===VZ.voz?' selected':'')+'>'+v+'</option>'}).join('')+'</select></div><div class="f"><label>Estilo de lectura</label><input type="text" data-vz="estilo" value="'+esc(VZ.estilo)+'"></div></div>'+
+   '<div class="f"><label>Acento</label><select data-vz="acento">'+Object.keys(ACENTOS).map(function(k){return '<option'+(k===VZ.acento?' selected':'')+'>'+k+'</option>'}).join('')+'</select><small>El acento se pide a Gemini por instrucción: es aproximado y cambia un poco según la voz. Prueba varias.</small></div><div class="grid" style="grid-template-columns:200px 1fr"><div class="f"><label>Voz</label><select data-vz="voz">'+VOCES.map(function(v){return '<option'+(v===VZ.voz?' selected':'')+'>'+v+'</option>'}).join('')+'</select></div><div class="f"><label>Estilo de lectura</label><input type="text" data-vz="estilo" value="'+esc(VZ.estilo)+'"></div></div>'+
    '<div class="acts"><button class="btn pri" data-act="vzgen"'+(VZ.busy?' disabled':'')+'>'+(VZ.busy?'Generando voz...':'Generar voz')+'</button></div></div>'+
    (VZ.err?'<p class="hint" style="color:var(--bad)">'+esc(VZ.err)+'</p>':'')+
    '<h2>Tomas guardadas ('+mi.length+')</h2>'+(mi.length?'<div class="panel">'+mi.map(function(m){return '<div class="row" style="flex-wrap:wrap"><div class="row-main"><div class="row-t">'+esc(m.voz)+' <span class="row-s">· '+esc(m.proy||'Texto libre')+' · '+esc(fmtFecha(new Date(m.fecha)))+'</span></div><div class="row-s">'+esc(m.estilo)+'</div></div><button class="btn sm" data-act="vzver" data-id="'+m.id+'">Escuchar</button><button class="btn sm" data-act="vzbajar" data-id="'+m.id+'">Descargar</button><button class="btn sm del" data-act="vzborrar" data-id="'+m.id+'">Eliminar</button><div id="au-'+m.id+'" style="width:100%"></div></div>'}).join('')+'</div>':'<div class="empty">Las voces que generes aparecerán aquí.</div>');
@@ -1328,7 +1329,7 @@ function modeloTTS(k){
   }).catch(function(){return null});
 }
 function pedirVoz(modelo,g){
-  return fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(modelo)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':g.k},body:JSON.stringify({contents:[{parts:[{text:(VZ.estilo?VZ.estilo+': ':'')+VZ.texto}]}],generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:VZ.voz}}}}})}).then(function(r){
+  return fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(modelo)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':g.k},body:JSON.stringify({contents:[{parts:[{text:'Say in Spanish with a '+(ACENTOS[VZ.acento]||'neutral Latin American')+' accent, '+(VZ.estilo||'in a natural tone')+':\n'+VZ.texto}]}],generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:VZ.voz}}}}})}).then(function(r){
     return r.json().catch(function(){return {}}).then(function(j){
       if(!r.ok){var e=new Error((j.error&&j.error.message)||('Error '+r.status));e.status=r.status;throw e}
       var pt=j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts,d=pt&&pt.filter(function(x){return x.inlineData})[0];
@@ -1349,12 +1350,56 @@ function generarVoz(){
   }).then(function(bl){
     return blobAUrl(bl).then(function(url){
       var id=uid(),p=GVD.proj.filter(function(x){return x.id===VZ.proy})[0];
-      return kvSet('voz:'+id,url).then(function(){S.voces=S.voces||{};(S.voces[a.id]=S.voces[a.id]||[]).unshift({id:id,proy:p?p.titulo:'',voz:VZ.voz,estilo:VZ.estilo,fecha:Date.now()});save();toast('Voz guardada')});
+      return kvSet('voz:'+id,url).then(function(){S.voces=S.voces||{};(S.voces[a.id]=S.voces[a.id]||[]).unshift({id:id,proy:p?p.titulo:'',voz:VZ.voz,acento:VZ.acento,texto:VZ.texto,estilo:VZ.estilo,fecha:Date.now()});save();toast('Voz guardada')});
     });
   }).catch(function(e){VZ.err=e.message}).then(function(){VZ.busy=false;if(route()==='guiones')pintarGV()});
 }
 /* Ensamblar videos de muestra */
-var EN={proy:'',voz:'',clips:[],music:null,vv:100,mv:18,subs:true,fmt:'9:16',busy:false},ENR=null;
+var EN={proy:'',voz:'',clips:[],music:null,mus:'',dimAuto:null,vv:100,mv:18,subs:true,fmt:'Auto',busy:false},ENR=null;
+var FMT_EN={'9:16':[540,960],'16:9':[960,540],'1:1':[720,720],'4:5':[576,720]};
+var MUSICAS=[['','Sin música'],['calida','Cálida y acogedora'],['alegre','Alegre y comercial'],['relajada','Relajada (lo-fi)'],['elegante','Elegante'],['energica','Enérgica']];
+function dimsEn(){return EN.fmt==='Auto'&&EN.dimAuto?EN.dimAuto:(FMT_EN[EN.fmt]||[540,960])}
+function calcAuto(){
+  if(!EN.clips.length){EN.dimAuto=null;return Promise.resolve()}
+  return cargarClip(EN.clips[0]).then(function(it){
+    if(it){var w=it.el.videoWidth||it.el.naturalWidth||it.el.width,h=it.el.videoHeight||it.el.naturalHeight||it.el.height;if(w&&h){var r=960/Math.max(w,h);EN.dimAuto=[Math.round(w*r/2)*2,Math.round(h*r/2)*2]}}
+  });
+}
+function vozTexto(k){
+  if(!k||k.indexOf('v:')!==0)return '';
+  var a=activa(),m=((S.voces||{})[a.id]||[]).filter(function(x){return x.id===k.slice(2)})[0];return m&&m.texto?m.texto:'';
+}
+function frases(t){
+  var o=[];
+  String(t||'').split(/\n+/).forEach(function(l){l.split(/(?<=[.!?…])\s+/).forEach(function(f){f=f.trim();if(!f)return;var w=f.split(/\s+/);while(w.length>9)o.push(w.splice(0,8).join(' '));if(w.length)o.push(w.join(' '))})});
+  return o;
+}
+function tiemposSub(fr,total){
+  var n=fr.map(function(f){return f.split(/\s+/).length}),sum=n.reduce(function(a,b){return a+b},0)||1,t=0;
+  return fr.map(function(f,i){var d=total*n[i]/sum,o={a:t,b:t+d,txt:f};t+=d;return o});
+}
+/* Música generada por código: sin derechos de autor */
+function musicaSint(AC,est,dur){
+  var sr=AC.sampleRate,n=Math.ceil((dur+1)*sr),buf=AC.createBuffer(2,n,sr),ch=[buf.getChannelData(0),buf.getChannelData(1)];
+  var E={calida:{bpm:84,prog:[[57,60,64],[53,57,60],[48,52,55],[55,59,62]],o:'tri',arp:1},alegre:{bpm:112,prog:[[60,64,67],[67,71,74],[69,72,76],[65,69,72]],o:'sq',arp:1},relajada:{bpm:70,prog:[[57,60,64,67],[53,57,60,64],[50,53,57,60],[52,55,59,62]],o:'sin',arp:0},elegante:{bpm:76,prog:[[48,55,60,64],[45,52,57,60],[41,48,53,57],[43,50,55,59]],o:'sin',arp:1},energica:{bpm:124,prog:[[57,60,64],[62,65,69],[60,64,67],[55,59,62]],o:'saw',arp:1,kick:1}}[est];
+  if(!E)return null;
+  var W=function(o,ph){ph=ph-Math.floor(ph);return o==='sin'?Math.sin(6.2832*ph):o==='tri'?4*Math.abs(ph-0.5)-1:o==='sq'?(ph<0.5?0.6:-0.6):2*ph-1},fq=function(m){return 440*Math.pow(2,(m-69)/12)};
+  var bar=240/E.bpm,beat=60/E.bpm,step=30/E.bpm,pk=0,c,i,t,k;
+  for(c=0;c<2;c++){
+    var d=ch[c],det=c?1.003:1;
+    for(i=0;i<n;i++){
+      t=i/sr;var bi=Math.floor(t/bar),bp=(t-bi*bar)/bar,cho=E.prog[bi%E.prog.length],v=0;
+      var env=Math.min(1,bp*10)*Math.min(1,(1-bp)*10);
+      for(k=0;k<cho.length;k++)v+=W(E.o==='saw'?'tri':E.o,fq(cho[k]-12)*t*det)*0.22*env;
+      if(E.arp){var si=Math.floor(t/step),f=(t-si*step)/step;v+=W(E.o==='saw'?'tri':E.o,fq(cho[si%cho.length]+12)*t*det)*0.3*Math.exp(-5*f)}
+      if(E.kick){var bt=t%beat;v+=Math.sin(6.2832*(55*bt+9*(1-Math.exp(-bt*30))))*Math.exp(-bt*14)*0.7;var ob=(t+beat/2)%beat;v+=(Math.sin(i*12.9898)*0.5)*Math.exp(-ob*70)*0.15}
+      var fi=Math.min(1,t/1),fo=Math.min(1,Math.max(0,(dur+0.5-t)/2));v*=fi*fo;
+      d[i]=v;var a2=Math.abs(v);if(a2>pk)pk=a2;
+    }
+  }
+  var g=pk>0?0.8/pk:1;for(c=0;c<2;c++)for(i=0;i<n;i++)ch[c][i]*=g;
+  return buf;
+}
 function vocesEn(a){
   var l=((S.voces||{})[a.id]||[]).map(function(m){return {k:'v:'+m.id,t:m.voz+' · '+(m.proy||'texto libre')+' · '+new Date(m.fecha).toLocaleDateString('es-CO')}});
   var p=GVD.proj.filter(function(x){return x.id===EN.proy})[0];
@@ -1365,19 +1410,19 @@ function pintarEns(b){
   var a=activa(),ps=GVD.proj.filter(function(p){return p.resultado&&p.resultado.escenas}),vs=vocesEn(a);
   b.innerHTML='<div class="panel" style="padding:14px 16px"><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))"><div class="f"><label>Proyecto (para los subtítulos)</label><select data-en="proy"><option value="">Sin subtítulos</option>'+ps.map(function(p){return '<option value="'+esc(p.id)+'"'+(p.id===EN.proy?' selected':'')+'>'+esc(p.titulo)+'</option>'}).join('')+'</select></div>'+
    '<div class="f"><label>Voz</label><select data-en="voz"><option value="">Sin voz</option>'+vs.map(function(v){return '<option value="'+esc(v.k)+'"'+(v.k===EN.voz?' selected':'')+'>'+esc(v.t)+'</option>'}).join('')+'</select></div>'+
-   '<div class="f"><label>Formato</label><select data-en="fmt">'+['9:16','16:9','1:1'].map(function(f){return '<option'+(f===EN.fmt?' selected':'')+'>'+f+'</option>'}).join('')+'</select></div></div>'+
+   '<div class="f"><label>Formato</label><select data-en="fmt">'+[['Auto','Automático (según las imágenes)'],['9:16','9:16 vertical'],['16:9','16:9 horizontal'],['1:1','1:1 cuadrado'],['4:5','4:5 post vertical']].map(function(f){return '<option value="'+f[0]+'"'+(f[0]===EN.fmt?' selected':'')+'>'+f[1]+'</option>'}).join('')+'</select></div></div>'+
    '<div class="f"><label>Clips e imágenes (se ordenan por nombre)</label><div class="acts"><label class="btn sm pri" for="enClips" style="cursor:pointer">Elegir clips</label><input type="file" id="enClips" accept="video/*,image/*" multiple hidden>'+(EN.clips.length?'<button class="btn sm" data-act="enlimpiar">Quitar todos</button>':'')+'</div>'+
    (EN.clips.length?'<div class="row-s" style="margin-top:6px">'+EN.clips.map(function(f,i){return (i+1)+'. '+esc(f.name)}).join(' · ')+'</div>':'<small>MP4, MOV, JPG o PNG. Los clips no se guardan: cárgalos cada vez.</small>')+'</div>'+
-   '<div class="f"><label>Música de fondo</label><div class="acts"><label class="btn sm" for="enMus" style="cursor:pointer">Elegir música</label><input type="file" id="enMus" accept="audio/*" hidden><span class="row-s">'+(EN.music?esc(EN.music.name):'Sin música')+'</span></div></div>'+
+   '<div class="f"><label>Música de fondo (generada, sin derechos de autor)</label><select data-en="mus">'+MUSICAS.map(function(m){return '<option value="'+m[0]+'"'+(m[0]===EN.mus?' selected':'')+'>'+m[1]+'</option>'}).join('')+'</select><div class="acts" style="margin-top:6px"><label class="btn sm" for="enMus" style="cursor:pointer">Usar mi propia música</label><input type="file" id="enMus" accept="audio/*" hidden><span class="row-s">'+(EN.music?esc(EN.music.name):'Sin música')+'</span></div></div>'+
    '<div class="grid" style="grid-template-columns:1fr 1fr"><div class="f"><label>Volumen de la voz: '+EN.vv+'%</label><input type="range" min="0" max="150" data-en="vv" value="'+EN.vv+'"></div><div class="f"><label>Volumen de la música: '+EN.mv+'%</label><input type="range" min="0" max="100" data-en="mv" value="'+EN.mv+'"></div></div>'+
    '<label class="row" style="border:0"><input type="checkbox" data-en="subs" style="width:auto"'+(EN.subs?' checked':'')+'><span>Subtítulos</span></label>'+
    '<div class="acts"><button class="btn" data-act="enprev"'+(EN.busy?' disabled':'')+'>Vista previa</button><button class="btn pri" data-act="enexp"'+(EN.busy?' disabled':'')+'>Exportar video</button>'+(EN.busy?'<button class="btn del" data-act="enstop">Detener</button>':'')+'</div><p class="row-s" id="enMsg" style="margin:8px 0 0"></p></div>'+
-   '<div style="margin-top:14px"><canvas id="enc" width="540" height="960" style="max-height:62vh;width:auto;max-width:100%;background:#000;border-radius:12px;display:block"></canvas></div><p class="hint">Mantén esta pestaña abierta mientras se genera: el video se arma en tiempo real y se descarga como WebM.</p>';
+   '<div style="margin-top:14px"><canvas id="enc" width="'+dimsEn()[0]+'" height="'+dimsEn()[1]+'" style="max-height:62vh;width:auto;max-width:100%;background:#000;border-radius:12px;display:block"></canvas></div><p class="hint">Mantén esta pestaña abierta mientras se genera: el video se arma en tiempo real y se descarga como WebM.</p>';
 }
 document.addEventListener('change',function(ev){
   var k=ev.target.getAttribute&&ev.target.getAttribute('data-en');
   if(k){EN[k]=ev.target.type==='checkbox'?ev.target.checked:ev.target.value;if(k==='proy'||k==='fmt')pintarGV();return}
-  if(ev.target.id==='enClips'){var fs=Array.prototype.slice.call(ev.target.files||[]);ev.target.value='';EN.clips=EN.clips.concat(fs).sort(function(a,b){return a.name.localeCompare(b.name,'es',{numeric:true})});pintarGV()}
+  if(ev.target.id==='enClips'){var fs=Array.prototype.slice.call(ev.target.files||[]);ev.target.value='';fs=fs.filter(function(f){return !EN.clips.some(function(c){return c.name===f.name&&c.size===f.size})});EN.clips=EN.clips.concat(fs).sort(function(a,b){return a.name.localeCompare(b.name,'es',{numeric:true})});calcAuto().then(pintarGV)}
   else if(ev.target.id==='enMus'){var f=ev.target.files&&ev.target.files[0];ev.target.value='';if(f){EN.music=f;pintarGV()}}
 });
 document.addEventListener('input',function(ev){var k=ev.target.getAttribute&&ev.target.getAttribute('data-en');if(k==='vv'||k==='mv'){EN[k]=Number(ev.target.value);var l=ev.target.parentNode.querySelector('label');if(l)l.textContent=(k==='vv'?'Volumen de la voz: ':'Volumen de la música: ')+EN[k]+'%'}});
@@ -1397,7 +1442,7 @@ function ensRun(grabar){
   var a=activa();if(EN.busy)return;
   if(!EN.clips.length)return toast('Agrega al menos un clip o una imagen.');
   EN.busy=true;pintarGV();
-  var msg=function(t){var e=$('#enMsg');if(e)e.textContent=t},dm={'9:16':[540,960],'16:9':[960,540],'1:1':[720,720]}[EN.fmt]||[540,960];
+  var msg=function(t){var e=$('#enMsg');if(e)e.textContent=t},dm=dimsEn();
   var cv=$('#enc');cv.width=dm[0];cv.height=dm[1];var x=cv.getContext('2d'),W=dm[0],H=dm[1];
   msg('Preparando clips y audio...');
   var AC=new (window.AudioContext||window.webkitAudioContext)(),dest=AC.createMediaStreamDestination();
@@ -1406,12 +1451,14 @@ function ensRun(grabar){
   Promise.all([vP,mP,Promise.all(EN.clips.map(cargarClip))]).then(function(r){
     var vb=r[0],mb=r[1],items=r[2].filter(Boolean);
     if(!items.length)throw new Error('No se pudieron leer los clips.');
+    if(!items.length)throw new Error('No se pudieron leer los clips.');
     var total=vb?vb.duration:items.reduce(function(t,i){return t+i.dur},0),ends=[],ac=0;
     items.forEach(function(it){ac+=vb?total/items.length:it.dur;ends.push(ac)});
-    var p=GVD.proj.filter(function(q){return q.id===EN.proy})[0],lines=p?(p.resultado.escenas||[]).map(function(e){return e.texto_pantalla||e.locucion||''}).filter(Boolean):[];
+    var p=GVD.proj.filter(function(q){return q.id===EN.proy})[0],vt=vozTexto(EN.voz),base=vt||(p?(p.resultado.escenas||[]).map(function(e){return e.locucion||e.texto_pantalla||''}).filter(Boolean).join('\n'):''),segs=EN.subs&&base?tiemposSub(frases(base),total):[];
+    if(!mb&&EN.mus)mb=musicaSint(AC,EN.mus,total);
     var srcs=[];
     var conectar=function(buf,vol,loop){var s=AC.createBufferSource(),g=AC.createGain();s.buffer=buf;s.loop=!!loop;g.gain.value=vol;s.connect(g);g.connect(dest);if(!grabar)g.connect(AC.destination);srcs.push(s)};
-    if(vb)conectar(vb,EN.vv/100,false);if(mb)conectar(mb,EN.mv/100,true);
+    if(vb)conectar(vb,EN.vv/100,false);if(mb)conectar(mb,EN.mv/100,!!EN.music);
     var chunks=[],mr=null;
     if(grabar){
       var st=cv.captureStream(30);dest.stream.getAudioTracks().forEach(function(t){st.addTrack(t)});
@@ -1434,8 +1481,9 @@ function ensRun(grabar){
       var it=items[si];
       if(it.t==='vid'){if(seg!==si){items.forEach(function(i){if(i.t==='vid')i.el.pause()});it.el.currentTime=0;it.el.play().catch(function(){})}}
       seg=si;cubrir(x,it.el,W,H);
-      if(EN.subs&&lines.length){
-        var tx=lines[Math.min(lines.length-1,Math.floor(t/total*lines.length))],fs=Math.round(W*0.06);
+      var sg=segs.filter(function(q){return t>=q.a&&t<q.b})[0];
+      if(sg){
+        var tx=sg.txt,fs=Math.round(Math.min(W,H)*0.06);
         x.font='700 '+fs+'px sans-serif';x.textAlign='center';x.textBaseline='top';
         var ws=tx.split(' '),ls=[],l='';ws.forEach(function(w){var q=l?l+' '+w:w;if(x.measureText(q).width>W*0.86&&l){ls.push(l);l=w}else l=q});ls.push(l);
         var bh=ls.length*fs*1.25+16,y0=H-bh-H*0.08;x.fillStyle='rgba(0,0,0,.6)';x.fillRect(W*0.04,y0,W*0.92,bh);x.fillStyle='#fff';
