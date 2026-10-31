@@ -257,6 +257,7 @@ var listeners=[];
 function save(){
   try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('No se pudo guardar. Revisa que el navegador permita almacenamiento y tenga espacio.')}
   listeners.forEach(function(f){try{f(S)}catch(e){}});
+  if(NUBE&&NUBE.h&&nubeAuto()){clearTimeout(NT);NT=setTimeout(function(){guardarCarpeta(false)},30000)}
 }
 function activa(){return S.empresas.find(function(e){return e.id===S.activa})||null}
 function setActiva(id){S.activa=id;save();renderAll()}
@@ -359,7 +360,7 @@ function vAjustes(){
    '<h2>Respaldo</h2><div class="panel">'+
    '<div class="row"><div class="row-main"><div class="row-t">Exportar respaldo</div><div class="row-s">Descarga un archivo con todas tus empresas y logos. '+(u?'Último respaldo: '+esc(fmtFecha(u))+'.':'Aún no has descargado ningún respaldo.')+'</div></div><button class="btn pri" data-act="exportar">Descargar respaldo</button></div>'+
    '<div class="row"><div class="row-main"><div class="row-t">Restaurar respaldo</div><div class="row-s">Reemplaza los datos actuales por los del archivo. La clave de este navegador no cambia.</div></div><label class="btn" for="rf" style="cursor:pointer">Elegir archivo</label><input type="file" id="rf" accept=".json,application/json" hidden></div></div>'+
-   marcaPanel()+gkPanel()+'<h2>Importar datos de las apps anteriores</h2><div class="panel">'+filasFuentes()+
+   marcaPanel()+nubePanel()+gkPanel()+'<h2>Importar datos de las apps anteriores</h2><div class="panel">'+filasFuentes()+
    '<div class="row"><div class="row-main"><div class="row-t">Importar respaldos</div><div class="row-s">Elige los archivos .json de tus apps; puedes seleccionar varios a la vez. Las empresas se unen por nombre y solo se llenan los datos vacíos de cada ficha. El contenido original se conserva completo para los módulos.</div></div><label class="btn pri" for="imf" style="cursor:pointer">Elegir archivos</label><input type="file" id="imf" accept=".json,application/json" multiple hidden></div></div>'+
    informeHtml()+
    '<p class="hint">La clave protege el acceso en este navegador. La sincronización entre equipos llega en la etapa 3.</p>';
@@ -456,6 +457,14 @@ document.addEventListener('click',function(ev){
   else if(act==='cerrar')$('#dlg').close();
   else if(act==='bloquear')bloquear();
   else if(act==='exportar')exportar();
+  else if(act==='eplan'){if(activa())formPlanSem()}
+  else if(act==='ezipall')bajarZipTodos();
+  else if(act==='ltgo')runLote();
+  else if(act==='ltstop'){LT.stop=true}
+  else if(act==='nelegir'){if(!window.showDirectoryPicker)return toast('Tu navegador no permite elegir carpetas. Usa Chrome o Edge.');window.showDirectoryPicker({mode:'readwrite'}).then(function(h){NUBE.h=h;NUBE.fecha=null;return kvSet('carpeta',h).then(leerFechaCarpeta)}).then(function(){renderMain();toast('Carpeta conectada')},function(){})}
+  else if(act==='nguardar')guardarCarpeta(true);
+  else if(act==='ncargar')cargarDesdeCarpeta();
+  else if(act==='nquitar'){NUBE.h=null;NUBE.fecha=null;db().then(function(d){d.transaction('kv','readwrite').objectStore('kv').delete('carpeta')}).catch(function(){});renderMain()}
   else if(act==='apguardar'){S.app=S.app||{};S.app.nombre=$('#ap1').value.trim()||'MPCONSULTORIA';save();renderAll();toast('Nombre guardado')}
   else if(act==='aplogoquitar'){S.app=S.app||{};delete S.app.logo;save();renderAll()}
   else if(act==='npgen')generarNP();
@@ -561,7 +570,7 @@ var ESTADOS=[['idea','Idea'],['guion','Guion'],['produccion','Producción'],['li
 function vGuiones(){
   var a=activa();
   return '<header class="ph"><div><h1>Guiones y voz</h1><p class="sub">'+(a?'Proyectos y guiones de '+esc(a.nombre)+'.':'Elige una empresa para ver sus guiones.')+'</p></div><button class="btn pri" data-act="gnuevo">Nuevo guion</button></header>'+
-   '<div class="tabs" style="flex-wrap:wrap">'+[['prod','Producción'],['nuevo','Nuevo proyecto'],['voz','Voz'],['ens','Ensamblar'],['guiones','Guiones']].map(function(t){return '<button data-act="gtab" data-id="'+t[0]+'" class="'+(GV.tab===t[0]?'on':'')+'">'+t[1]+'</button>'}).join('')+'</div><div id="gvBody"><p class="sub">Cargando...</p></div>';
+   '<div class="tabs" style="flex-wrap:wrap">'+[['prod','Producción'],['nuevo','Nuevo proyecto'],['lote','Lote'],['voz','Voz'],['ens','Ensamblar'],['guiones','Guiones']].map(function(t){return '<button data-act="gtab" data-id="'+t[0]+'" class="'+(GV.tab===t[0]?'on':'')+'">'+t[1]+'</button>'}).join('')+'</div><div id="gvBody"><p class="sub">Cargando...</p></div>';
 }
 function cargarGV(){
   var a=activa();if(!a)return;
@@ -585,6 +594,7 @@ function estadoDe(p){var e=(S.estados||{})[p.id]||p.estado;return ESTADOS.some(f
 function pintarGV(){
   var b=$('#gvBody');if(!b||!GVD)return;
   if(GV.tab==='nuevo'){pintarNP(b);return}
+  if(GV.tab==='lote'){pintarLote(b);return}
   if(GV.tab==='voz'){pintarVoz(b);return}
   if(GV.tab==='ens'){pintarEns(b);return}
   if(GV.tab==='prod'){
@@ -884,7 +894,7 @@ document.addEventListener('change',function(ev){
 function vDis(){
   var a=activa();
   if(!a)return '<header class="ph"><div><h1>Estudio de diseño</h1></div></header><div class="empty"><b>Sin empresa activa</b>Elige o crea una empresa para diseñar sus campañas.</div>';
-  return '<header class="ph"><div><h1>Estudio de diseño</h1><p class="sub">Carruseles, historias y posts de '+esc(a.nombre)+'. Se arman con su ficha: logo, color, productos y redes.</p></div><div class="tools" style="margin:0"><button class="btn" data-act="egen">Generar desde la ficha</button><button class="btn pri" data-act="ezip">Todo en ZIP</button></div></header><div class="ed" id="edBody"></div>';
+  return '<header class="ph"><div><h1>Estudio de diseño</h1><p class="sub">Carruseles, historias y posts de '+esc(a.nombre)+'. Se arman con su ficha: logo, color, productos y redes.</p></div><div class="tools" style="margin:0"><button class="btn" data-act="eplan">Plan semanal</button><button class="btn" data-act="egen">Generar desde la ficha</button><button class="btn" data-act="ezipall">ZIP de todos los diseños</button><button class="btn pri" data-act="ezip">Todo en ZIP</button></div></header><div class="ed" id="edBody"></div>';
 }
 function pintarDis(){
   var a=activa(),b=$('#edBody');if(!a||!b)return;
@@ -1495,6 +1505,98 @@ function ensRun(grabar){
     requestAnimationFrame(frame);
   }).catch(function(e){try{AC.close()}catch(x2){}EN.busy=false;ENR=null;pintarGV();var m2=$('#enMsg');if(m2)m2.textContent='Error: '+e.message});
 }
+/* Producción en lote */
+var LT={sel:null,cant:{reel:3,largo:0,cuna:1,jingle:0},dur:{reel:'30',largo:'180',cuna:'30',jingle:'30'},run:false,stop:false,log:[]};
+var LT_T={reel:'Reel / TikTok / Short',largo:'Video largo (YouTube)',cuna:'Cuña comercial / radio',jingle:'Jingle'};
+function ltTotal(){var ne=S.empresas.filter(function(e){return LT.sel[e.id]}).length,pp=Object.keys(LT.cant).reduce(function(t,k){return t+(Number(LT.cant[k])||0)},0);return {ne:ne,pp:pp,n:ne*pp}}
+function pintarLote(b){
+  if(!LT.sel){LT.sel={};S.empresas.forEach(function(e){LT.sel[e.id]=true})}
+  var t=ltTotal(),d={reel:['15','30','60'],largo:['180'],cuna:['15','30','60'],jingle:['15','30','60']};
+  b.innerHTML='<p class="sub" style="margin:0 0 12px">Crea guiones con prompts de Veo para varias empresas de una vez. Los proyectos quedan en la columna Guion de cada empresa.</p><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">'+
+   '<div class="panel" style="padding:12px 16px"><div class="row-t" style="margin:4px 0">1 · Empresas</div>'+S.empresas.map(function(e){return '<label class="row" style="cursor:pointer">'+av(e,'sm')+'<span class="row-main">'+esc(e.nombre)+'</span><input type="checkbox" data-lt-e="'+e.id+'" style="width:auto"'+(LT.sel[e.id]?' checked':'')+'></label>'}).join('')+'</div>'+
+   '<div class="panel" style="padding:12px 16px"><div class="row-t" style="margin:4px 0">2 · Qué crear por empresa</div>'+Object.keys(LT_T).map(function(k){return '<div class="row"><span class="row-main">'+LT_T[k]+'</span><input type="number" min="0" max="10" data-lt-c="'+k+'" value="'+LT.cant[k]+'" style="width:70px"><select data-lt-d="'+k+'" style="width:auto">'+d[k].map(function(x){return '<option value="'+x+'"'+(x===LT.dur[k]?' selected':'')+'>'+x+' s</option>'}).join('')+'</select></div>'}).join('')+'</div></div>'+
+   '<div class="panel" style="padding:12px 16px;margin-top:12px"><div class="row-t">Resumen</div><div class="row-s">Se crearán <b>'+t.n+'</b> piezas ('+t.pp+' por empresa × '+t.ne+' empresas). Unas '+t.n+' llamadas a Gemini, con una pausa corta entre cada una.</div><div class="acts" style="margin-top:10px"><button class="btn pri" data-act="ltgo"'+(LT.run?' disabled':'')+'>'+(LT.run?'Produciendo...':'Iniciar producción automática')+'</button>'+(LT.run?'<button class="btn del" data-act="ltstop">Detener</button>':'')+'</div><p class="row-s" style="margin:8px 0 0">Puedes seguir usando el estudio, pero no cierres esta pestaña mientras trabaja.</p></div>'+
+   (LT.log.length?'<h2>Avance</h2><div class="panel">'+LT.log.map(function(x){return '<div class="row"><span style="color:'+(x.ok?'var(--ok)':'var(--bad)')+'">'+(x.ok?'●':'✕')+'</span><div class="row-main row-s">'+esc(x.t)+'</div></div>'}).join('')+'</div>':'');
+}
+document.addEventListener('change',function(ev){
+  var g=function(k){return ev.target.getAttribute&&ev.target.getAttribute(k)},e=g('data-lt-e'),c=g('data-lt-c'),d=g('data-lt-d');
+  if(e){LT.sel[e]=ev.target.checked;pintarGV()}else if(c){LT.cant[c]=Math.max(0,Math.min(10,Number(ev.target.value)||0));pintarGV()}else if(d){LT.dur[d]=ev.target.value;pintarGV()}
+});
+function runLote(){
+  if(LT.run)return;
+  if(!gk().k){LT.log=[{t:'Falta la clave de Gemini. Pégala en Ajustes.',ok:false}];return pintarGV()}
+  var tareas=[];
+  S.empresas.filter(function(e){return LT.sel[e.id]}).forEach(function(e){Object.keys(LT.cant).forEach(function(k){for(var i=0;i<(Number(LT.cant[k])||0);i++)tareas.push({e:e,k:k})})});
+  if(!tareas.length)return toast('Elige empresas y cantidades.');
+  LT.run=true;LT.stop=false;LT.log=[];pintarGV();
+  var chain=Promise.resolve();
+  tareas.forEach(function(tk){
+    chain=chain.then(function(){
+      if(LT.stop)return;
+      var ant=Object.assign({},NP),pv=((S.proyectos||{})[tk.e.id]||[]).slice(0,8).map(function(p){return p.titulo}).join('; ');
+      NP.tipo=LT_T[tk.k];NP.dur=LT.dur[tk.k];NP.tema=pv?'Elige un tema distinto a estos que ya existen: '+pv:'';
+      var pr=promptNP(tk.e);Object.assign(NP,ant);
+      var rot=tk.e.nombre+' · '+LT_T[tk.k];
+      return llamarGemini(pr).then(leerJSONtexto).then(function(r){
+        S.proyectos=S.proyectos||{};(S.proyectos[tk.e.id]=S.proyectos[tk.e.id]||[]).unshift({id:uid(),propio:true,titulo:r.titulo||'Proyecto',tipo:LT_T[tk.k],duracion:Number(LT.dur[tk.k]),estado:'guion',resultado:r});save();LT.log.push({t:rot+': '+(r.titulo||'listo'),ok:true});
+      },function(er){LT.log.push({t:rot+': '+er.message,ok:false})}).then(function(){if(route()==='guiones'&&GV.tab==='lote')pintarGV();return esperar(1200)});
+    });
+  });
+  chain.then(function(){LT.run=false;if(route()==='guiones'&&GV.tab==='lote')pintarGV();toast(LT.stop?'Producción detenida':'Producción en lote terminada')});
+}
+/* Plan semanal del Estudio de diseño */
+var DIAS_PS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+function slug(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'diseno'}
+function formPlanSem(){
+  abrirD2('Plan semanal con Gemini','<form id="frmPS" class="pw" style="max-width:none"><div class="f"><label>Días a publicar</label><div class="acts" style="flex-wrap:wrap">'+DIAS_PS.map(function(d,i){return '<label class="btn sm" style="cursor:pointer"><input type="checkbox" name="dia" value="'+d+'"'+(i===0||i===2||i===4?' checked':'')+' style="width:auto"> '+d+'</label>'}).join('')+'</div></div><div class="f"><label for="ps1">Tema o enfoque (opcional)</label><input type="text" id="ps1" placeholder="Ej: promoción de fin de mes"></div><div class="f"><label for="ps2">Diapositivas por carrusel</label><select id="ps2"><option>3</option><option selected>4</option><option>5</option></select></div><p id="psMsg" class="row-s"></p><div><button type="submit" class="btn pri">Crear plan</button></div></form>');
+}
+function promptPlanSem(a,dias,n,tema){
+  return 'Eres estratega de redes sociales para negocios locales de Colombia. Crea un plan semanal con un carrusel de '+n+' diapositivas por cada uno de estos días: '+dias.join(', ')+'.\n\nNEGOCIO: '+a.nombre+' ('+a.tipo+(a.ciudad?', '+a.ciudad:'')+'). Productos: '+(a.productos||'no indicados')+'. Diferenciales: '+(a.diferenciales||'no indicados')+'. Público: '+(a.publico||'general')+'. Tono: '+(a.tono||'Cercano')+'. Objetivo: '+(a.objetivo||'Vender más')+(a.whatsapp?'. WhatsApp: '+a.whatsapp:'')+'.'+(tema?'\nENFOQUE DE LA SEMANA: '+tema:'')+
+   '\n\nVaría el tema de cada día (producto, beneficios, consejo útil, historia del negocio, promoción). Cada diapositiva: t (título corto, máximo 8 palabras), b (texto, máximo 20 palabras) y cta (solo en la última, vacío en las demás). Español colombiano.\nResponde SOLO con un arreglo JSON válido, sin texto extra:\n[{"dia":"","titulo":"","slides":[{"t":"","b":"","cta":""}],"copy":"texto para la publicación con emojis moderados","hashtags":["#"]}]';
+}
+function leerPlan(t){
+  t=String(t||'').replace(/```json|```/g,'');var i=t.indexOf('['),j=t.lastIndexOf(']');
+  if(i<0||j<i)throw new Error('Gemini no devolvió el plan en el formato esperado. Intenta de nuevo.');
+  var o=JSON.parse(t.slice(i,j+1)).filter(function(x){return x&&x.slides&&x.slides.length});
+  if(!o.length)throw new Error('El plan llegó vacío. Intenta de nuevo.');return o;
+}
+function crearDisenosPlan(a,items){
+  var de=dsEmp(),c1=/^#[0-9a-f]{6}$/i.test(a.color)?a.color:'#7c5cff',pal=[[c1,oscuro(c1)],[oscuro(c1),c1],[c1,'#111827']],first=null;
+  items.forEach(function(it,k){
+    var pl=pal[k%3],id='d'+uid();
+    de.list.push({id:id,nombre:(it.dia||('Día '+(k+1)))+' · '+String(it.titulo||'').slice(0,40),fmt:'sq',copy:String(it.copy||''),hashtags:(it.hashtags||[]).join(' '),slides:it.slides.map(function(x,i){return {t:String(x.t||''),b:String(x.b||''),cta:String(x.cta||''),c1:pl[0],c2:pl[1],tc:'#ffffff',ts:i===0?100:84}})});
+    if(!first)first=id;
+  });
+  if(first)de.cur=first;DS.i=0;save();
+}
+document.addEventListener('submit',function(ev){
+  if(ev.target.id!=='frmPS')return;
+  ev.preventDefault();
+  var a=activa(),dias=Array.prototype.slice.call(ev.target.querySelectorAll('input[name=dia]:checked')).map(function(x){return x.value}),m=$('#psMsg');
+  if(!dias.length){m.textContent='Elige al menos un día.';return}
+  if(!gk().k){m.style.color='var(--bad)';m.textContent='Falta la clave de Gemini. Pégala en Ajustes.';return}
+  m.style.color='';m.textContent='Creando el plan con Gemini... puede tardar un poco.';
+  llamarGemini(promptPlanSem(a,dias,$('#ps2').value,$('#ps1').value.trim())).then(leerPlan).then(function(it){
+    crearDisenosPlan(a,it);$('#dlg2').close();pintarDis();toast('Plan creado: '+it.length+' diseños');
+  }).catch(function(e){m.style.color='var(--bad)';m.textContent=e.message});
+});
+function dsBlobD(d,i,a){
+  var f=FMTS[d.fmt]||FMTS.sq,c=document.createElement('canvas');
+  return (d.slides[i].img?cargarImg(d.slides[i].img):Promise.resolve()).then(function(){dibujar(c,d.slides[i],i,d.slides.length,a,f[0],f[1]);return new Promise(function(res){c.toBlob(res,'image/png')})});
+}
+function bajarZipTodos(){
+  var a=activa(),de=dsEmp(),n=slug(a.nombre),enc=new TextEncoder(),fs=[],chain=Promise.resolve();
+  toast('Preparando el ZIP...');
+  de.list.forEach(function(d,di){
+    var dn=('0'+(di+1)).slice(-2)+'-'+slug(d.nombre).slice(0,40);
+    d.slides.forEach(function(_,i){chain=chain.then(function(){return dsBlobD(d,i,a)}).then(function(b){return b.arrayBuffer()}).then(function(buf){fs.push({name:n+'/'+dn+'/'+(i+1)+'.png',data:new Uint8Array(buf)})})});
+    chain=chain.then(function(){
+      var tx=d.nombre+'\n\n'+d.slides.map(function(x,i){return 'Diapositiva '+(i+1)+'\nTítulo: '+x.t+(x.b?'\nTexto: '+x.b:'')+(x.cta?'\nBotón: '+x.cta:'')}).join('\n\n')+(d.copy?'\n\n--- Texto para publicar ---\n'+d.copy+(d.hashtags?'\n'+d.hashtags:''):'');
+      fs.push({name:n+'/'+dn+'/textos.txt',data:enc.encode('\ufeff'+tx)});
+    });
+  });
+  chain.then(function(){bajar(zipear(fs),n+'-todos-los-disenos.zip');toast('ZIP descargado')}).catch(function(){toast('No se pudo crear el ZIP.')});
+}
 /* Clave de acceso única */
 var AKEY='mpconsultoria_auth_v1',SKEY='mpconsultoria_sesion',unlocked=false,fails=0,lockUntil=0;
 function getAuth(){try{return JSON.parse(localStorage.getItem(AKEY))}catch(e){return null}}
@@ -1558,7 +1660,7 @@ function unlock(){
   try{sessionStorage.setItem(SKEY,'1')}catch(e){}
   $('#lock').hidden=true;$('#lock').innerHTML='';
   try{if(!localStorage.getItem(KEY))save()}catch(e){}
-  renderAll();
+  renderAll();cargarNube();
 }
 function bloquear(){
   unlocked=false;
@@ -1790,23 +1892,68 @@ function importarArchivos(files){
 var BKEY='mpconsultoria_ultimo_respaldo';
 function ultimoResp(){try{var t=localStorage.getItem(BKEY);return t?new Date(t):null}catch(e){return null}}
 function fmtFecha(d){return d.toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'})+', '+d.toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit'})}
-function exportar(){
-  var now=new Date(),falloIdb=false;
-  kvAll().catch(function(){falloIdb=true;return {}}).then(function(all){
+function construirRespaldo(){
+  var falloIdb=false,now=new Date();
+  return kvAll().catch(function(){falloIdb=true;return {}}).then(function(all){
     var legacy={},voces={},imgs={},extra={};
     Object.keys(all).forEach(function(k){if(k.indexOf('legacy:')===0)legacy[k.slice(7)]=all[k];else if(k.indexOf('voz:')===0)voces[k.slice(4)]=all[k];else if(k.indexOf('img:')===0)imgs[k.slice(4)]=all[k]});
     Object.keys(S).forEach(function(k){if(['empresas','activa','imports','informe'].indexOf(k)<0)extra[k]=S[k]});
-    var data={app:'MPCONSULTORIA',version:2,fecha:now.toISOString(),datos:{empresas:S.empresas,activa:S.activa,imports:S.imports||{},legacy:legacy,voces:voces,imgs:imgs,extra:extra}};
-    var blob=new Blob([JSON.stringify(data)],{type:'application/json'});
-    var url=URL.createObjectURL(blob),a=document.createElement('a');
-    a.href=url;a.download='mpconsultoria-respaldo-'+now.toISOString().slice(0,10)+'.json';
+    return {falloIdb:falloIdb,now:now,data:{app:'MPCONSULTORIA',version:2,fecha:now.toISOString(),datos:{empresas:S.empresas,activa:S.activa,imports:S.imports||{},legacy:legacy,voces:voces,imgs:imgs,extra:extra}}};
+  });
+}
+function exportar(){
+  construirRespaldo().then(function(r){
+    var blob=new Blob([JSON.stringify(r.data)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download='mpconsultoria-respaldo-'+r.now.toISOString().slice(0,10)+'.json';
     document.body.appendChild(a);a.click();a.remove();
     setTimeout(function(){URL.revokeObjectURL(url)},1500);
-    try{localStorage.setItem(BKEY,now.toISOString())}catch(e){}
-    toast(falloIdb&&S.imports&&Object.keys(S.imports).length?'Respaldo descargado, pero sin los datos importados (el navegador no los dejó leer).':'Respaldo descargado');
+    try{localStorage.setItem(BKEY,r.now.toISOString())}catch(e){}
+    toast(r.falloIdb&&S.imports&&Object.keys(S.imports).length?'Respaldo descargado, pero sin los datos importados (el navegador no los dejó leer).':'Respaldo descargado');
     renderMain();
   });
 }
+
+/* Carpeta en la nube (Drive / OneDrive sincronizados) */
+var NUBE={h:null,fecha:null},NUBE_ARCH='mpconsultoria-datos.json',NT=null;
+function nubeAuto(){return localStorage.getItem('mpconsultoria_nauto')==='1'}
+function cargarNube(){
+  kvGet('carpeta').then(function(h){NUBE.h=h||null;if(h)return leerFechaCarpeta()}).catch(function(){});
+}
+function permisoCarpeta(h,pedir){
+  if(!h.queryPermission)return Promise.resolve(true);
+  return h.queryPermission({mode:'readwrite'}).then(function(p){if(p==='granted')return true;if(!pedir)return false;return h.requestPermission({mode:'readwrite'}).then(function(q){return q==='granted'})});
+}
+function leerFechaCarpeta(){
+  var h=NUBE.h;if(!h)return Promise.resolve();
+  return permisoCarpeta(h,false).then(function(ok){if(!ok)return;return h.getFileHandle(NUBE_ARCH).then(function(f){return f.getFile()}).then(function(f){NUBE.fecha=new Date(f.lastModified)})}).catch(function(){NUBE.fecha=null});
+}
+function nubePanel(){
+  var n=NUBE;
+  return '<h2>Carpeta en la nube (Google Drive / OneDrive)</h2><div class="panel"><div class="pw" style="max-width:none;padding:12px 0"><p class="row-s" style="margin:0">Elige una carpeta que Google Drive u OneDrive ya sincronicen en tu PC. La app guarda ahí el archivo <b>'+NUBE_ARCH+'</b> (todo: empresas, voces, imágenes y módulos). En el portátil eliges la misma carpeta y cargas el más reciente. Funciona en Chrome y Edge.</p>'+
+   (n.h?'<p style="margin:0">Carpeta: <b>'+esc(n.h.name)+'</b>'+(n.fecha?' · archivo guardado el '+esc(fmtFecha(n.fecha)):' · aún sin archivo')+'</p>':'<p class="row-s" style="margin:0">Aún no hay carpeta elegida.</p>')+
+   '<div class="acts"><button class="btn pri" data-act="nelegir">'+(n.h?'Cambiar carpeta':'Elegir carpeta')+'</button>'+(n.h?'<button class="btn" data-act="nguardar">Guardar ahora</button><button class="btn" data-act="ncargar">Cargar el más reciente</button><button class="btn del" data-act="nquitar">Desconectar</button>':'')+'</div>'+
+   (n.h?'<label class="row" style="border:0"><input type="checkbox" data-nauto style="width:auto"'+(nubeAuto()?' checked':'')+'><span>Guardar solo 30 segundos después de cada cambio (cuando el navegador ya tenga permiso)</span></label>':'')+'</div></div>';
+}
+function guardarCarpeta(manual){
+  var h=NUBE.h;if(!h)return;
+  permisoCarpeta(h,manual).then(function(ok){
+    if(!ok){if(manual)toast('Sin permiso para escribir en la carpeta.');return}
+    return construirRespaldo().then(function(r){
+      return h.getFileHandle(NUBE_ARCH,{create:true}).then(function(f){return f.createWritable()}).then(function(w){return w.write(JSON.stringify(r.data)).then(function(){return w.close()})}).then(function(){
+        try{localStorage.setItem(BKEY,r.now.toISOString())}catch(e){}
+        NUBE.fecha=r.now;if(manual){toast('Guardado en la carpeta');if(route()==='ajustes')renderMain()}
+      });
+    });
+  }).catch(function(e){if(manual)toast('No se pudo guardar en la carpeta.')});
+}
+function cargarDesdeCarpeta(){
+  var h=NUBE.h;if(!h)return;
+  permisoCarpeta(h,true).then(function(ok){
+    if(!ok)return toast('Sin permiso para leer la carpeta.');
+    return h.getFileHandle(NUBE_ARCH).then(function(f){return f.getFile()}).then(function(f){restaurar(f)},function(){toast('En esa carpeta todavía no hay un archivo '+NUBE_ARCH+'. Primero usa "Guardar ahora" en el otro equipo.')});
+  }).catch(function(){toast('No se pudo leer la carpeta.')});
+}
+document.addEventListener('change',function(ev){if(ev.target.hasAttribute&&ev.target.hasAttribute('data-nauto')){try{localStorage.setItem('mpconsultoria_nauto',ev.target.checked?'1':'0')}catch(e){}}});
 function limpiarEmpresa(x){
   var o={};
   for(var k in x){if(typeof x[k]==='string')o[k]=x[k]}
